@@ -1,0 +1,1517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Contract v0.1 - Minimal MVP</title>
+    <style>
+      :root {
+        --bg: #f7f8fa;
+        --surface: #ffffff;
+        --surface-soft: #f0f3f6;
+        --text: #182026;
+        --muted: #60707d;
+        --line: #d9e0e6;
+        --line-strong: #c2ccd4;
+        --blue: #2563eb;
+        --green: #16875d;
+        --orange: #b45309;
+        --red: #be123c;
+        --teal: #0f766e;
+        --violet: #6d28d9;
+        --shadow: 0 10px 30px rgba(24, 32, 38, 0.08);
+        --radius: 8px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      code,
+      pre {
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--line);
+        background: rgba(247, 248, 250, 0.94);
+        backdrop-filter: blur(14px);
+      }
+
+      .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 14px 24px;
+      }
+
+      .brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 1px solid #9ec5fe;
+        border-radius: var(--radius);
+        background: #e8f1ff;
+        color: var(--blue);
+        font-weight: 800;
+      }
+
+      .brand h1 {
+        margin: 0;
+        overflow: hidden;
+        color: var(--text);
+        font-size: 18px;
+        font-weight: 750;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .topbar-actions {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      .button:hover {
+        border-color: #9fb0bf;
+        background: #f8fafc;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 270px minmax(0, 1fr);
+        gap: 28px;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 28px 24px 48px;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 82px;
+        align-self: start;
+        max-height: calc(100vh - 108px);
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        padding-right: 20px;
+      }
+
+      .sidebar-title {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .nav-list {
+        display: grid;
+        gap: 4px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .nav-list a {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-radius: var(--radius);
+        color: #33414c;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .nav-list a:hover {
+        background: var(--surface-soft);
+        color: var(--text);
+      }
+
+      .nav-count {
+        min-width: 26px;
+        border-radius: 999px;
+        background: #e3e9ef;
+        color: #455562;
+        padding: 2px 7px;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        gap: 24px;
+        align-items: stretch;
+        margin-bottom: 28px;
+      }
+
+      .hero-copy {
+        padding: 12px 0;
+      }
+
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface);
+        color: #41505c;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .pill.good {
+        border-color: #9fd8c0;
+        background: #e7f7ef;
+        color: #106744;
+      }
+
+      .pill.warn {
+        border-color: #f0c787;
+        background: #fff6df;
+        color: #8a4a05;
+      }
+
+      .hero h2 {
+        max-width: 780px;
+        margin: 0;
+        font-size: 56px;
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      .hero p {
+        max-width: 760px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .decision-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      .decision-item {
+        min-height: 86px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 14px;
+      }
+
+      .decision-item strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 14px;
+      }
+
+      .decision-item span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .flow-panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        padding: 18px;
+      }
+
+      .flow-panel h3 {
+        margin: 0 0 14px;
+        font-size: 15px;
+      }
+
+      .flow {
+        display: grid;
+        gap: 10px;
+      }
+
+      .flow-step {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fbfcfd;
+        padding: 10px;
+      }
+
+      .step-number {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: var(--radius);
+        background: #e8f1ff;
+        color: var(--blue);
+        font-weight: 800;
+      }
+
+      .flow-step strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .flow-step span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .section {
+        margin-top: 34px;
+        scroll-margin-top: 96px;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 16px;
+      }
+
+      .section-header h2 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      .section-header p {
+        max-width: 760px;
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+
+      .db-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .db-table {
+        min-height: 86px;
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--teal);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 12px;
+      }
+
+      .db-table strong {
+        display: block;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+      }
+
+      .db-table span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .search {
+        width: 100%;
+        min-height: 42px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        padding: 10px 12px;
+        font: inherit;
+        outline: none;
+      }
+
+      .search:focus {
+        border-color: #79a8ff;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+      }
+
+      .segments {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: flex-end;
+      }
+
+      .segment {
+        min-height: 38px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: #40505d;
+        padding: 8px 10px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .segment[aria-pressed="true"] {
+        border-color: #8bb6ff;
+        background: #e8f1ff;
+        color: #174ea6;
+      }
+
+      .endpoint-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .endpoint-card {
+        display: grid;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 16px;
+        box-shadow: 0 4px 18px rgba(24, 32, 38, 0.04);
+      }
+
+      .endpoint-card[hidden] {
+        display: none;
+      }
+
+      .endpoint-top {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+
+      .method {
+        display: inline-flex;
+        min-width: 58px;
+        justify-content: center;
+        border-radius: var(--radius);
+        padding: 5px 8px;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .method.get {
+        background: var(--green);
+      }
+
+      .method.post {
+        background: var(--blue);
+      }
+
+      .method.patch {
+        background: var(--orange);
+      }
+
+      .method.delete {
+        background: var(--red);
+      }
+
+      .endpoint-path {
+        min-width: 0;
+      }
+
+      .endpoint-path code {
+        display: block;
+        overflow-wrap: anywhere;
+        color: #17202a;
+        font-size: 14px;
+        font-weight: 750;
+      }
+
+      .endpoint-path span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .endpoint-card p {
+        margin: 0;
+        color: #465664;
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .tag {
+        border-radius: 999px;
+        background: #edf2f7;
+        color: #40505d;
+        padding: 3px 8px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tag.customer {
+        background: #e8f7f0;
+        color: #106744;
+      }
+
+      .tag.staff {
+        background: #fff3df;
+        color: #8a4a05;
+      }
+
+      .tag.auth {
+        background: #f0e9ff;
+        color: #5620b5;
+      }
+
+      .tag.planned {
+        background: #edf2f7;
+        color: #5a6670;
+      }
+
+      details {
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+
+      summary {
+        color: #25313b;
+        font-size: 13px;
+        font-weight: 750;
+        cursor: pointer;
+      }
+
+      pre {
+        overflow: auto;
+        max-height: 360px;
+        margin: 10px 0 0;
+        border: 1px solid #d5dde4;
+        border-radius: var(--radius);
+        background: #111827;
+        color: #e5eef8;
+        padding: 12px;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .info-panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 16px;
+      }
+
+      .info-panel h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+
+      .info-panel ul {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 18px;
+        color: #465664;
+      }
+
+      .planned-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .planned-card {
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--violet);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 16px;
+      }
+
+      .planned-card h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+
+      .planned-card p {
+        margin: 0 0 10px;
+        color: var(--muted);
+      }
+
+      .planned-card ul {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding-left: 18px;
+        color: #465664;
+        font-size: 13px;
+      }
+
+      .planned-link {
+        display: inline-flex;
+        margin-top: 12px;
+        color: var(--blue);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .mismatch {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .mismatch .info-panel:first-child {
+        border-top: 4px solid var(--orange);
+      }
+
+      .mismatch .info-panel:last-child {
+        border-top: 4px solid var(--green);
+      }
+
+      .empty-state {
+        display: none;
+        border: 1px dashed var(--line-strong);
+        border-radius: var(--radius);
+        background: #fbfcfd;
+        color: var(--muted);
+        padding: 18px;
+        text-align: center;
+      }
+
+      .empty-state.visible {
+        display: block;
+      }
+
+      footer {
+        margin-top: 42px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        padding-top: 18px;
+        font-size: 13px;
+      }
+
+      @media (max-width: 1100px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+          max-height: none;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+          padding: 0 0 16px;
+        }
+
+        .nav-list {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .db-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .planned-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .topbar-inner {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 12px 16px;
+        }
+
+        .topbar-actions {
+          width: 100%;
+        }
+
+        .button {
+          width: 100%;
+        }
+
+        .layout {
+          padding: 20px 16px 36px;
+        }
+
+        .nav-list {
+          grid-template-columns: 1fr;
+        }
+
+        .hero h2 {
+          font-size: 36px;
+        }
+
+        .decision-strip,
+        .toolbar,
+        .endpoint-grid,
+        .split,
+        .mismatch,
+        .planned-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .segments {
+          justify-content: stretch;
+        }
+
+        .segment {
+          flex: 1 1 120px;
+        }
+
+        .db-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .section-header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+
+      @media (max-width: 440px) {
+        .db-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .brand h1 {
+          white-space: normal;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="#top" aria-label="API contract home">
+            <span class="brand-mark">API</span>
+            <span>
+              <h1>API Contract v0.1</h1>
+              <p>Restaurant-customer text-based service MVP</p>
+            </span>
+          </a>
+          <div class="topbar-actions">
+            <a class="button" href="./api-contract-v0.2.html">Open v0.2</a>
+            <a class="button" href="./api-contract-v0.1.md">Open Markdown</a>
+          </div>
+        </div>
+      </header>
+
+      <div class="layout" id="top">
+        <aside class="sidebar" aria-label="Page navigation">
+          <p class="sidebar-title">Document Map</p>
+          <ul class="nav-list">
+            <li><a href="#overview">Overview <span class="nav-count">1</span></a></li>
+            <li><a href="#database">MVP Database <span class="nav-count">6</span></a></li>
+            <li><a href="#endpoints">Endpoints <span class="nav-count">15</span></a></li>
+            <li><a href="#planned">Planned v0.2 <span class="nav-count">5</span></a></li>
+            <li><a href="#mismatch">Mismatch <span class="nav-count">2</span></a></li>
+            <li><a href="#decision">Team Decision <span class="nav-count">1</span></a></li>
+          </ul>
+        </aside>
+
+        <main>
+          <section class="hero" id="overview">
+            <div class="hero-copy">
+              <div class="eyebrow">
+                <span class="pill good">Build now</span>
+                <span class="pill warn">Minimal database only</span>
+                <span class="pill">Draft: 2026-05-22</span>
+              </div>
+              <h2>Small enough to build, clear enough for the team.</h2>
+              <p>
+                This visual contract turns the MVP API into a quick reference for
+                customer QR sessions, chat, staff takeover, and service requests.
+                Menu, cart, order, review, and analytics are intentionally marked
+                as planned work.
+              </p>
+              <div class="decision-strip">
+                <div class="decision-item">
+                  <strong>v0.1 focus</strong>
+                  <span>Restaurant table communication through chat.</span>
+                </div>
+                <div class="decision-item">
+                  <strong>Not real ordering yet</strong>
+                  <span>`order_request` is a chat/request type only.</span>
+                </div>
+                <div class="decision-item">
+                  <strong>Staff protected</strong>
+                  <span>Staff identity comes from auth, not request body.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-panel" aria-label="Minimal MVP flow">
+              <h3>Minimal User Flow</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <span class="step-number">1</span>
+                  <span><strong>QR scan</strong><span>Customer opens table link.</span></span>
+                </div>
+                <div class="flow-step">
+                  <span class="step-number">2</span>
+                  <span><strong>Session starts</strong><span>Backend creates anonymous session.</span></span>
+                </div>
+                <div class="flow-step">
+                  <span class="step-number">3</span>
+                  <span><strong>Chat runs</strong><span>Customer, AI, staff, and system messages persist.</span></span>
+                </div>
+                <div class="flow-step">
+                  <span class="step-number">4</span>
+                  <span><strong>Request created</strong><span>Water, bill, help, or order-related need.</span></span>
+                </div>
+                <div class="flow-step">
+                  <span class="step-number">5</span>
+                  <span><strong>Staff resolves</strong><span>Dashboard tracks status and active sessions.</span></span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="database">
+            <div class="section-header">
+              <div>
+                <h2>MVP Database Scope</h2>
+                <p>Only these six tables are assumed by API Contract v0.1.</p>
+              </div>
+            </div>
+            <div class="db-grid">
+              <div class="db-table"><strong>restaurants</strong><span>Basic restaurant profile.</span></div>
+              <div class="db-table"><strong>restaurant_tables</strong><span>Table numbers and QR tokens.</span></div>
+              <div class="db-table"><strong>customer_sessions</strong><span>Anonymous dine-in visits.</span></div>
+              <div class="db-table"><strong>staff_users</strong><span>Staff and manager logins.</span></div>
+              <div class="db-table"><strong>chat_messages</strong><span>Customer, AI, staff, and system chat.</span></div>
+              <div class="db-table"><strong>customer_requests</strong><span>Concrete service tasks for staff.</span></div>
+            </div>
+          </section>
+
+          <section class="section" id="endpoints">
+            <div class="section-header">
+              <div>
+                <h2>Endpoint Inventory</h2>
+                <p>Filter by area or search by path, method, purpose, table, or keyword.</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <input
+                class="search"
+                id="endpointSearch"
+                type="search"
+                placeholder="Search endpoints, e.g. chat, staff, QR, request..."
+                aria-label="Search endpoints"
+              />
+              <div class="segments" aria-label="Endpoint filter">
+                <button class="segment" type="button" data-filter="all" aria-pressed="true">All</button>
+                <button class="segment" type="button" data-filter="public" aria-pressed="false">Public</button>
+                <button class="segment" type="button" data-filter="customer" aria-pressed="false">Customer</button>
+                <button class="segment" type="button" data-filter="auth" aria-pressed="false">Auth</button>
+                <button class="segment" type="button" data-filter="staff" aria-pressed="false">Staff</button>
+              </div>
+            </div>
+
+            <div class="endpoint-grid" id="endpointGrid">
+              <article class="endpoint-card" data-area="public" data-text="get restaurant information public restaurants restaurantId">
+                <div class="endpoint-top">
+                  <span class="method get">GET</span>
+                  <div class="endpoint-path">
+                    <code>/api/restaurants/:restaurantId</code>
+                    <span>Public restaurant information</span>
+                  </div>
+                </div>
+                <p>Used to show basic restaurant name, description, address, and timestamps.</p>
+                <div class="tags"><span class="tag">restaurants</span><span class="tag">No auth</span></div>
+                <details>
+                  <summary>Response example</summary>
+                  <pre>{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Sushi Demo Restaurant",
+    "description": "Small local restaurant",
+    "address": "Oulu, Finland"
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="public customer" data-text="post start customer session qr code token restaurant_tables customer_sessions">
+                <div class="endpoint-top">
+                  <span class="method post">POST</span>
+                  <div class="endpoint-path">
+                    <code>/api/customer-sessions/start</code>
+                    <span>Start session from QR code</span>
+                  </div>
+                </div>
+                <p>Validates `qr_code_token`, checks table activity, and creates an anonymous session.</p>
+                <div class="tags"><span class="tag customer">Customer</span><span class="tag">QR</span></div>
+                <details>
+                  <summary>Request and response</summary>
+                  <pre>Request:
+{
+  "qr_code_token": "table5-demo-token"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "session_id": 101,
+    "session_token": "session-token-xyz",
+    "restaurant_id": 1,
+    "table_id": 5,
+    "table_number": "5",
+    "status": "active"
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="customer" data-text="get current customer session restore bearer session_token customer_sessions">
+                <div class="endpoint-top">
+                  <span class="method get">GET</span>
+                  <div class="endpoint-path">
+                    <code>/api/customer-sessions/me</code>
+                    <span>Restore current customer session</span>
+                  </div>
+                </div>
+                <p>Returns the active session linked to the customer token.</p>
+                <div class="tags"><span class="tag customer">Customer token</span><span class="tag">customer_sessions</span></div>
+                <details>
+                  <summary>Auth and response</summary>
+                  <pre>Authorization: Bearer &lt;session_token&gt;
+
+{
+  "success": true,
+  "data": {
+    "id": 101,
+    "restaurant_id": 1,
+    "table_id": 5,
+    "table_number": "5",
+    "status": "active",
+    "ended_at": null
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="customer" data-text="patch close customer session session closed expired customer_sessions">
+                <div class="endpoint-top">
+                  <span class="method patch">PATCH</span>
+                  <div class="endpoint-path">
+                    <code>/api/customer-sessions/me/close</code>
+                    <span>Close current customer session</span>
+                  </div>
+                </div>
+                <p>Marks a session as `closed` and stores `ended_at`.</p>
+                <div class="tags"><span class="tag customer">Customer token</span><span class="tag">Status update</span></div>
+                <details>
+                  <summary>Response example</summary>
+                  <pre>{
+  "success": true,
+  "data": {
+    "id": 101,
+    "status": "closed",
+    "ended_at": "2026-05-22T11:30:00Z"
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="customer" data-text="get chat messages current session history chat_messages">
+                <div class="endpoint-top">
+                  <span class="method get">GET</span>
+                  <div class="endpoint-path">
+                    <code>/api/customer-sessions/me/messages</code>
+                    <span>Load customer chat history</span>
+                  </div>
+                </div>
+                <p>Returns chat messages for the authenticated customer session, optionally paginated.</p>
+                <div class="tags"><span class="tag customer">Customer token</span><span class="tag">chat_messages</span></div>
+                <details>
+                  <summary>Response example</summary>
+                  <pre>{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "sender_type": "customer",
+      "message_text": "Can I get water?",
+      "message_type": "service_request"
+    },
+    {
+      "id": 2,
+      "sender_type": "ai",
+      "message_text": "I will notify the staff.",
+      "message_type": "service_request"
+    }
+  ]
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="customer" data-text="post api chat customer ai message service request customer_requests chat_messages">
+                <div class="endpoint-top">
+                  <span class="method post">POST</span>
+                  <div class="endpoint-path">
+                    <code>/api/chat</code>
+                    <span>Main customer chat endpoint</span>
+                  </div>
+                </div>
+                <p>Saves customer message, optionally creates a request, and persists AI or system reply.</p>
+                <div class="tags"><span class="tag customer">Customer token</span><span class="tag">AI</span><span class="tag">Core MVP</span></div>
+                <details open>
+                  <summary>Request and response shape</summary>
+                  <pre>Request:
+{
+  "message_text": "Can I get water?"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "customer_message": {},
+    "ai_message": {},
+    "created_request": {
+      "id": 5,
+      "request_type": "water",
+      "status": "new"
+    }
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="customer" data-text="post customer requests create water bill staff help service customer_requests">
+                <div class="endpoint-top">
+                  <span class="method post">POST</span>
+                  <div class="endpoint-path">
+                    <code>/api/customer-requests</code>
+                    <span>Create service request</span>
+                  </div>
+                </div>
+                <p>Creates a staff-visible task such as water, bill, order-related help, or staff help.</p>
+                <div class="tags"><span class="tag customer">Customer token</span><span class="tag">customer_requests</span></div>
+                <details>
+                  <summary>Request and response</summary>
+                  <pre>Request:
+{
+  "request_type": "water",
+  "request_text": "Can I get water?",
+  "priority": "normal"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": 5,
+    "table_number": "5",
+    "request_type": "water",
+    "status": "new",
+    "priority": "normal"
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="auth staff" data-text="post staff login auth email password staff_users">
+                <div class="endpoint-top">
+                  <span class="method post">POST</span>
+                  <div class="endpoint-path">
+                    <code>/api/auth/staff/login</code>
+                    <span>Staff login</span>
+                  </div>
+                </div>
+                <p>Authenticates staff or manager and returns staff user data plus token/session.</p>
+                <div class="tags"><span class="tag auth">Auth</span><span class="tag staff">Staff</span></div>
+                <details>
+                  <summary>Request and response</summary>
+                  <pre>Request:
+{
+  "email": "staff@example.com",
+  "password": "password123"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "staff_user": {
+      "id": 2,
+      "restaurant_id": 1,
+      "role": "staff"
+    },
+    "token": "staff-jwt-token"
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="auth staff" data-text="get current staff user auth me staff_users">
+                <div class="endpoint-top">
+                  <span class="method get">GET</span>
+                  <div class="endpoint-path">
+                    <code>/api/auth/staff/me</code>
+                    <span>Get current staff user</span>
+                  </div>
+                </div>
+                <p>Restores the logged-in staff session for the dashboard.</p>
+                <div class="tags"><span class="tag auth">Staff token</span><span class="tag">staff_users</span></div>
+                <details>
+                  <summary>Response example</summary>
+                  <pre>{
+  "success": true,
+  "data": {
+    "id": 2,
+    "restaurant_id": 1,
+    "name": "Staff Member",
+    "email": "staff@example.com",
+    "role": "staff"
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="auth staff" data-text="post staff logout auth">
+                <div class="endpoint-top">
+                  <span class="method post">POST</span>
+                  <div class="endpoint-path">
+                    <code>/api/auth/staff/logout</code>
+                    <span>Staff logout</span>
+                  </div>
+                </div>
+                <p>Ends the staff login session.</p>
+                <div class="tags"><span class="tag auth">Staff token</span></div>
+                <details>
+                  <summary>Response example</summary>
+                  <pre>{
+  "success": true,
+  "data": {
+    "message": "Logged out successfully."
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="staff" data-text="get staff sessions active dashboard customer_sessions open request count">
+                <div class="endpoint-top">
+                  <span class="method get">GET</span>
+                  <div class="endpoint-path">
+                    <code>/api/staff/sessions</code>
+                    <span>List active customer sessions</span>
+                  </div>
+                </div>
+                <p>Shows ongoing sessions and request counts in the staff dashboard.</p>
+                <div class="tags"><span class="tag staff">Staff token</span><span class="tag">Dashboard</span></div>
+                <details>
+                  <summary>Query and response</summary>
+                  <pre>Query:
+?restaurant_id=1&status=active
+
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "id": 101,
+      "table_number": "5",
+      "status": "active",
+      "last_message_at": "2026-05-22T10:15:00Z",
+      "open_request_count": 1
+    }
+  ]
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="staff" data-text="get staff session messages chat monitoring chat_messages">
+                <div class="endpoint-top">
+                  <span class="method get">GET</span>
+                  <div class="endpoint-path">
+                    <code>/api/staff/sessions/:sessionId/messages</code>
+                    <span>View chat history as staff</span>
+                  </div>
+                </div>
+                <p>Lets staff inspect a customer chat before replying or intervening.</p>
+                <div class="tags"><span class="tag staff">Staff token</span><span class="tag">Live chat</span></div>
+                <details>
+                  <summary>Response example</summary>
+                  <pre>{
+  "success": true,
+  "data": [
+    {
+      "id": 15,
+      "sender_type": "customer",
+      "message_text": "Can I get water?"
+    },
+    {
+      "id": 16,
+      "sender_type": "ai",
+      "message_text": "I will notify the staff."
+    }
+  ]
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="staff" data-text="post staff session message manual reply takeover chat_messages">
+                <div class="endpoint-top">
+                  <span class="method post">POST</span>
+                  <div class="endpoint-path">
+                    <code>/api/staff/sessions/:sessionId/messages</code>
+                    <span>Staff replies to customer chat</span>
+                  </div>
+                </div>
+                <p>Creates a `staff` chat message. Staff user is inferred from authentication.</p>
+                <div class="tags"><span class="tag staff">Staff token</span><span class="tag">Human takeover</span></div>
+                <details>
+                  <summary>Request and response</summary>
+                  <pre>Request:
+{
+  "message_text": "Hi, I will bring water soon."
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": 20,
+    "sender_type": "staff",
+    "message_type": "normal"
+  }
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="staff" data-text="get staff customer requests dashboard new in_progress resolved customer_requests">
+                <div class="endpoint-top">
+                  <span class="method get">GET</span>
+                  <div class="endpoint-path">
+                    <code>/api/staff/customer-requests</code>
+                    <span>List customer requests</span>
+                  </div>
+                </div>
+                <p>Shows new, active, resolved, or cancelled customer requests for staff.</p>
+                <div class="tags"><span class="tag staff">Staff token</span><span class="tag">customer_requests</span></div>
+                <details>
+                  <summary>Query and response</summary>
+                  <pre>Query:
+?restaurant_id=1&status=new
+
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "id": 5,
+      "table_number": "5",
+      "request_type": "water",
+      "status": "new",
+      "priority": "normal"
+    }
+  ]
+}</pre>
+                </details>
+              </article>
+
+              <article class="endpoint-card" data-area="staff" data-text="patch staff customer request update status resolved cancelled in_progress">
+                <div class="endpoint-top">
+                  <span class="method patch">PATCH</span>
+                  <div class="endpoint-path">
+                    <code>/api/staff/customer-requests/:requestId</code>
+                    <span>Update request status</span>
+                  </div>
+                </div>
+                <p>Marks a customer request as `in_progress`, `resolved`, or `cancelled`.</p>
+                <div class="tags"><span class="tag staff">Staff token</span><span class="tag">Status update</span></div>
+                <details>
+                  <summary>Request and response</summary>
+                  <pre>Request:
+{
+  "status": "resolved"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": 5,
+    "status": "resolved",
+    "updated_at": "2026-05-22T10:20:00Z"
+  }
+}</pre>
+                </details>
+              </article>
+            </div>
+            <div class="empty-state" id="emptyState">No endpoints match the current filter.</div>
+          </section>
+
+          <section class="section" id="planned">
+            <div class="section-header">
+              <div>
+                <h2>Planned API v0.2</h2>
+                <p>These are real user-story needs, but the current database does not support them yet.</p>
+              </div>
+            </div>
+            <div class="planned-grid">
+              <div class="planned-card">
+                <h3>Menu API</h3>
+                <p>Requires menu tables before AI can answer dish and allergen questions seriously.</p>
+                <ul>
+                  <li>menu_categories</li>
+                  <li>menu_items</li>
+                  <li>allergens</li>
+                  <li>menu_item_allergens</li>
+                </ul>
+                <a class="planned-link" href="./menu-api-contract-v0.2.md">Open Menu API contract</a>
+              </div>
+              <div class="planned-card">
+                <h3>Cart API</h3>
+                <p>Required for shared table cart and quantity editing.</p>
+                <ul>
+                  <li>carts</li>
+                  <li>cart_items</li>
+                  <li>session ownership rules</li>
+                </ul>
+              </div>
+              <div class="planned-card">
+                <h3>Order API</h3>
+                <p>Required before kitchen display and real order status can exist.</p>
+                <ul>
+                  <li>orders</li>
+                  <li>order_items</li>
+                  <li>status history optional</li>
+                </ul>
+              </div>
+              <div class="planned-card">
+                <h3>Review API</h3>
+                <p>Optional for MVP unless the thesis scope includes restaurant discovery.</p>
+                <ul>
+                  <li>restaurant_reviews</li>
+                  <li>staff replies</li>
+                  <li>moderation rules</li>
+                </ul>
+              </div>
+              <div class="planned-card">
+                <h3>AI Logs And Analytics</h3>
+                <p>Useful for thesis evaluation and research metrics.</p>
+                <ul>
+                  <li>ai_response_logs</li>
+                  <li>analytics_events</li>
+                  <li>restaurant_knowledge_base</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="mismatch">
+            <div class="section-header">
+              <div>
+                <h2>Current Mismatch</h2>
+                <p>This is the main scope issue Dan should explain to the team.</p>
+              </div>
+            </div>
+            <div class="mismatch">
+              <div class="info-panel">
+                <h3>User Stories Mention</h3>
+                <ul>
+                  <li>Menu browsing, dish images, prices, allergens</li>
+                  <li>Cart and shared cart</li>
+                  <li>Real order placement and order status</li>
+                  <li>Kitchen display system</li>
+                  <li>Reviews, ratings, replies</li>
+                </ul>
+              </div>
+              <div class="info-panel">
+                <h3>Minimal DB Supports</h3>
+                <ul>
+                  <li>Restaurant information and QR tables</li>
+                  <li>Anonymous customer sessions</li>
+                  <li>Chat messages from customer, AI, staff, system</li>
+                  <li>Customer service requests for staff dashboard</li>
+                  <li>Staff login and basic monitoring</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="decision">
+            <div class="section-header">
+              <div>
+                <h2>Team Decision</h2>
+                <p>Use this as the short agreement before implementation starts.</p>
+              </div>
+            </div>
+            <div class="split">
+              <div class="info-panel">
+                <h3>Build In v0.1</h3>
+                <ul>
+                  <li>QR session start</li>
+                  <li>Customer chat and AI response persistence</li>
+                  <li>Customer service request creation</li>
+                  <li>Staff dashboard request monitoring</li>
+                  <li>Staff manual chat reply</li>
+                </ul>
+              </div>
+              <div class="info-panel">
+                <h3>Say This To The Team</h3>
+                <p>
+                  Because the current database is still minimal, API Contract v0.1
+                  only includes endpoints supported by the current schema. Menu,
+                  cart, order, review, and analytics endpoints are planned for
+                  v0.2. This keeps the MVP realistic and avoids confusion during
+                  implementation.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <footer>
+            Static visual companion for
+            <a href="./api-contract-v0.1.md">api-contract-v0.1.md</a>.
+            No build step or server is required.
+          </footer>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const searchInput = document.querySelector("#endpointSearch");
+      const cards = Array.from(document.querySelectorAll(".endpoint-card"));
+      const buttons = Array.from(document.querySelectorAll(".segment"));
+      const emptyState = document.querySelector("#emptyState");
+      let activeFilter = "all";
+
+      function applyFilters() {
+        const query = searchInput.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        cards.forEach((card) => {
+          const area = card.dataset.area || "";
+          const text = `${card.dataset.text || ""} ${card.textContent || ""}`.toLowerCase();
+          const matchesFilter = activeFilter === "all" || area.split(" ").includes(activeFilter);
+          const matchesQuery = !query || text.includes(query);
+          const visible = matchesFilter && matchesQuery;
+          card.hidden = !visible;
+          if (visible) visibleCount += 1;
+        });
+
+        emptyState.classList.toggle("visible", visibleCount === 0);
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          activeFilter = button.dataset.filter;
+          buttons.forEach((item) => item.setAttribute("aria-pressed", "false"));
+          button.setAttribute("aria-pressed", "true");
+          applyFilters();
+        });
+      });
+
+      searchInput.addEventListener("input", applyFilters);
+    </script>
+  </body>
+</html>
