@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Restaurant {
+  id            Int                       @id @default(autoincrement())
+  name          String                    @db.VarChar(255)
+  description   String?                   @db.Text
+  address       String?                   @db.VarChar(255)
+  createdAt     DateTime?                 @map("created_at")
+  updatedAt     DateTime?                 @map("updated_at")
+  tables        RestaurantTable[]
+  sessions      CustomerSession[]
+  staffUsers    StaffUser[]
+  menuItems     MenuItem[]
+  knowledgeBase RestaurantKnowledgeBase[]
+
+  @@map("restaurants")
+}
+
+model RestaurantTable {
+  id           Int               @id @default(autoincrement())
+  restaurantId Int               @map("restaurant_id")
+  tableNumber  String            @map("table_number") @db.VarChar(50)
+  qrCodeToken  String            @unique @map("qr_code_token") @db.VarChar(255)
+  isActive     Boolean           @default(true) @map("is_active")
+  createdAt    DateTime?         @map("created_at")
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id])
+  sessions     CustomerSession[]
+
+  @@map("restaurant_tables")
+}
+
+model CustomerSession {
+  id               Int                @id @default(autoincrement())
+  restaurantId     Int                @map("restaurant_id")
+  tableId          Int                @map("table_id")
+  sessionToken     String             @unique @map("session_token") @db.VarChar(255)
+  status           String             @db.VarChar(50)
+  startedAt        DateTime?          @map("started_at")
+  endedAt          DateTime?          @map("ended_at")
+  restaurant       Restaurant         @relation(fields: [restaurantId], references: [id])
+  table            RestaurantTable    @relation(fields: [tableId], references: [id])
+  chatMessages     ChatMessage[]
+  customerRequests CustomerRequest[]
+  aiResponseLogs   AiResponseLog[]
+
+  @@map("customer_sessions")
+}
+
+model StaffUser {
+  id           Int         @id @default(autoincrement())
+  restaurantId Int         @map("restaurant_id")
+  name         String      @db.VarChar(255)
+  email        String      @unique @db.VarChar(255)
+  passwordHash String?     @map("password_hash") @db.VarChar(255)
+  role         String?     @db.VarChar(50)
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime?   @map("created_at")
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@map("staff_users")
+}
+
+model ChatMessage {
+  id                     Int             @id @default(autoincrement())
+  sessionId              Int             @map("session_id")
+  senderType             String          @map("sender_type") @db.VarChar(50)
+  messageContent         String          @map("message_content") @db.Text
+  createdAt              DateTime?       @map("created_at")
+  session                CustomerSession @relation(fields: [sessionId], references: [id])
+  customerAiResponseLogs AiResponseLog[] @relation("AiCustomerMessageLog")
+  aiResponseLogs         AiResponseLog[] @relation("AiMessageLog")
+
+  @@map("chat_messages")
+}
+
+model CustomerRequest {
+  id          Int             @id @default(autoincrement())
+  sessionId   Int             @map("session_id")
+  requestType String          @map("request_type") @db.VarChar(100)
+  status      String          @db.VarChar(50)
+  description String?         @db.Text
+  createdAt   DateTime?       @map("created_at")
+  resolvedAt  DateTime?       @map("resolved_at")
+  session     CustomerSession @relation(fields: [sessionId], references: [id])
+
+  @@map("customer_requests")
+}
+
+model MenuItem {
+  id                Int                 @id @default(autoincrement())
+  restaurantId      Int                 @map("restaurant_id")
+  name              String              @db.VarChar(255)
+  description       String?             @db.Text
+  category          String?             @db.VarChar(100)
+  price             Decimal             @db.Decimal(10, 2)
+  ingredients       String?             @db.Text
+  imageUrl          String?             @map("image_url") @db.VarChar(500)
+  isAvailable       Boolean             @default(true) @map("is_available")
+  isVegetarian      Boolean             @default(false) @map("is_vegetarian")
+  isVegan           Boolean             @default(false) @map("is_vegan")
+  createdAt         DateTime?           @map("created_at")
+  updatedAt         DateTime?           @map("updated_at")
+  restaurant        Restaurant          @relation(fields: [restaurantId], references: [id])
+  menuItemAllergens MenuItemAllergen[]
+
+  @@map("menu_items")
+}
+
+model Allergen {
+  id                Int                 @id @default(autoincrement())
+  name              String              @unique @db.VarChar(100)
+  description       String?             @db.Text
+  menuItemAllergens MenuItemAllergen[]
+
+  @@map("allergens")
+}
+
+model MenuItemAllergen {
+  menuItemId Int      @map("menu_item_id")
+  allergenId Int      @map("allergen_id")
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  allergen   Allergen @relation(fields: [allergenId], references: [id])
+
+  @@id([menuItemId, allergenId])
+  @@map("menu_item_allergens")
+}
+
+model RestaurantKnowledgeBase {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  title        String     @db.VarChar(255)
+  content      String     @db.Text
+  category     String?    @db.VarChar(100)
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime?  @map("created_at")
+  updatedAt    DateTime?  @map("updated_at")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@map("restaurant_knowledge_base")
+}
+
+model AiResponseLog {
+  id                Int              @id @default(autoincrement())
+  sessionId         Int?             @map("session_id")
+  customerMessageId Int?             @map("customer_message_id")
+  aiMessageId       Int?             @map("ai_message_id")
+  modelName         String?          @map("model_name") @db.VarChar(100)
+  retrievedContext  String?          @map("retrieved_context") @db.Text
+  prompt            String?          @db.Text
+  response          String?          @db.Text
+  handoverRequired  Boolean          @default(false) @map("handover_required")
+  createdAt         DateTime?        @map("created_at")
+  session           CustomerSession? @relation(fields: [sessionId], references: [id])
+  customerMessage   ChatMessage?     @relation("AiCustomerMessageLog", fields: [customerMessageId], references: [id])
+  aiMessage         ChatMessage?     @relation("AiMessageLog", fields: [aiMessageId], references: [id])
+
+  @@map("ai_response_logs")
+}
