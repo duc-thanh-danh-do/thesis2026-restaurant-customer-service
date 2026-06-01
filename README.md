@@ -3,6 +3,16 @@
 
 This platform aims to solve the high hardware costs and rigid communication gaps in traditional restaurant ordering systems. By utilizing a **Unified Next.js Backend-for-Frontend (BFF) Architecture**, it delivers a seamless, app-free dining experience. Customers can scan table-specific QR codes to access dynamic menus, manage shared carts in real-time, and consult a context-aware AI assistant (powered by Google Gemini) for personalized dish recommendations and allergen safety.
 
+To ensure code quality and prevent integration issues, this project strictly follows **GitHub Flow** and utilizes an automated CI/CD pipeline.
+
+### 1. Branching Strategy (分支管理规范)
+- **DO NOT push directly to `main`.** (严禁直接向 main 分支推送代码)
+- For any new feature or bug fix, create a new branch from `main`:
+  ```bash
+  git checkout -b feat/your-feature-name
+  # or
+  git checkout -b fix/your-bug-name
+
 ### ✨ Key Features (Planned & In Progress)
 * **Frictionless Customer Access:** QR-code-based session entry without mandatory account registration.
 * **Agile Menu Management:** Staff dashboard to manage menu categories, items, visibility, and availability.
