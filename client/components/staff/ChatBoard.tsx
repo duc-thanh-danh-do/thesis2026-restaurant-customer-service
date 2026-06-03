@@ -22,7 +22,7 @@ export default function ChatBoard() {
             <div>
               <p className="text-xs text-slate-400 mb-1">Assistant · 35 min ago</p>
               <div className="bg-slate-100 text-slate-800 p-3.5 rounded-2xl rounded-tl-none max-w-md text-sm">
-                I've forwarded this to a staff member to confirm.
+              {"I've"} forwarded this to a staff member to confirm.
               </div>
             </div>
           </div>

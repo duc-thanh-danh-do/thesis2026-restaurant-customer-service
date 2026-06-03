@@ -45,7 +45,7 @@ export default function OrderPanel() {
   
             {/* Order Details */}
             <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl text-xs mt-1 border border-slate-100">
-              <span className="text-slate-700 font-medium">2× Spicy Tomato Orecchiette</span>
+              <span className="text-slate-700 font-medium">2x Spicy Tomato Orecchiette</span>
               <div className="flex items-center gap-2 border border-slate-200 bg-white rounded-md px-1.5 py-0.5">
                 <button type="button" className="text-slate-400 hover:text-slate-600 font-bold px-0.5">-</button>
                 <span className="text-slate-700 font-bold text-[11px]">2</span>
