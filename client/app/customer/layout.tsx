@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import CustomerChatButton from "../../components/customer/CustomerChatBubble";
 import CustomerBottomNav from "../../components/customer/CustomerBottomNav";
 
 type CustomerLayoutProps = {
@@ -9,6 +10,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
       {children}
+      <CustomerChatButton />
       <CustomerBottomNav />
     </div>
   );
