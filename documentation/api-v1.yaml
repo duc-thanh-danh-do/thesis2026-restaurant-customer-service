@@ -1,0 +1,1366 @@
+openapi: 3.0.3
+
+info:
+  title: Restaurant AI Chat System API
+  version: 1.0.0
+  description: >
+    API contract for a web-based restaurant communication system.
+    The system allows dine-in customers to scan a table QR code, start a customer session,
+    ask menu or service questions through an AI assistant, and request staff support when needed.
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
+tags:
+  - name: Customer Sessions
+    description: Customer session operations after scanning a table QR code
+  - name: Menu
+    description: Menu item and allergen information
+  - name: Chat
+    description: Customer chat and AI assistant responses
+  - name: Staff
+    description: Staff dashboard and handover operations
+  - name: Knowledge Base
+    description: Restaurant-specific information used for grounded AI responses
+  - name: AI Logs
+    description: AI response logs for debugging and evaluation
+
+paths:
+  /api/customer-sessions:
+    post:
+      tags:
+        - Customer Sessions
+      summary: Create a customer session from a table QR code
+      description: >
+        Creates a new customer session when a dine-in customer scans a QR code at a restaurant table.
+        The customer does not need to log in. The returned sessionToken is used to identify the session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerSessionRequest"
+      responses:
+        "201":
+          description: Customer session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCustomerSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/customer-sessions/{sessionToken}:
+    get:
+      tags:
+        - Customer Sessions
+      summary: Get customer session information
+      description: Retrieves the current customer session using the session token.
+      parameters:
+        - $ref: "#/components/parameters/SessionTokenPath"
+      responses:
+        "200":
+          description: Customer session found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSession"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/customer-sessions/{sessionToken}/close:
+    patch:
+      tags:
+        - Customer Sessions
+      summary: Close a customer session
+      description: Closes an active customer session.
+      parameters:
+        - $ref: "#/components/parameters/SessionTokenPath"
+      responses:
+        "200":
+          description: Customer session closed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSession"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/customer-sessions/{sessionToken}/messages:
+    get:
+      tags:
+        - Chat
+      summary: Get chat history for a customer session
+      description: Retrieves chat messages connected to the customer session.
+      parameters:
+        - $ref: "#/components/parameters/SessionTokenPath"
+      responses:
+        "200":
+          description: Chat messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMessage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/customer-sessions/{sessionToken}/requests:
+    post:
+      tags:
+        - Customer Sessions
+      summary: Create a customer request
+      description: >
+        Creates a direct customer request from the customer interface, such as asking for staff help,
+        requesting payment, reporting a complaint, or asking for allergy support.
+      parameters:
+        - $ref: "#/components/parameters/SessionTokenPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerRequestRequest"
+      responses:
+        "201":
+          description: Customer request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCustomerRequestResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/chat/messages:
+    post:
+      tags:
+        - Chat
+      summary: Send a customer message to the AI assistant
+      description: >
+        Sends a customer message to the backend. The backend stores the customer message,
+        retrieves relevant restaurant data, sends a grounded prompt to the AI model,
+        stores the AI response, and returns the reply to the customer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendChatMessageRequest"
+      responses:
+        "200":
+          description: AI assistant response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendChatMessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/restaurants/{restaurantId}/menu-items:
+    get:
+      tags:
+        - Menu
+      summary: Get menu items for a restaurant
+      description: Retrieves menu items for a restaurant.
+      parameters:
+        - $ref: "#/components/parameters/RestaurantIdPath"
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+          example: main
+        - name: isAvailable
+          in: query
+          required: false
+          schema:
+            type: boolean
+          example: true
+        - name: isVegetarian
+          in: query
+          required: false
+          schema:
+            type: boolean
+          example: true
+      responses:
+        "200":
+          description: Menu items retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  menuItems:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MenuItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/menu-items/{menuItemId}:
+    get:
+      tags:
+        - Menu
+      summary: Get menu item details
+      description: Retrieves detailed information about one menu item.
+      parameters:
+        - $ref: "#/components/parameters/MenuItemIdPath"
+      responses:
+        "200":
+          description: Menu item retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/menu-items/{menuItemId}/allergens:
+    get:
+      tags:
+        - Menu
+      summary: Get allergens for a menu item
+      description: Retrieves allergens connected to a menu item.
+      parameters:
+        - $ref: "#/components/parameters/MenuItemIdPath"
+      responses:
+        "200":
+          description: Allergens retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allergens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Allergen"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/login:
+    post:
+      tags:
+        - Staff
+      summary: Staff login
+      description: Authenticates a staff user and returns a bearer token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffLoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffLoginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/staff/sessions:
+    get:
+      tags:
+        - Staff
+      summary: Get customer sessions for staff dashboard
+      description: Retrieves customer sessions visible to the authenticated staff user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/SessionStatus"
+          example: waiting_staff
+      responses:
+        "200":
+          description: Customer sessions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StaffSessionSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/staff/sessions/{sessionId}:
+    get:
+      tags:
+        - Staff
+      summary: Get one customer session for staff
+      description: Retrieves session details and messages for the staff dashboard.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdPath"
+      responses:
+        "200":
+          description: Session details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: "#/components/schemas/StaffSessionSummary"
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMessage"
+                  requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StaffCustomerRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/sessions/{sessionId}/messages:
+    post:
+      tags:
+        - Staff
+      summary: Send a staff message to a customer session
+      description: Allows staff to send a message in a customer session after handover.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffMessageRequest"
+      responses:
+        "201":
+          description: Staff message created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/requests:
+    get:
+      tags:
+        - Staff
+      summary: Get customer requests for staff dashboard
+      description: Retrieves customer requests such as payment, complaint, allergy support, or staff handover.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RequestStatus"
+          example: open
+        - name: requestType
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RequestType"
+          example: payment
+      responses:
+        "200":
+          description: Customer requests retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StaffCustomerRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/staff/requests/{requestId}:
+    patch:
+      tags:
+        - Staff
+      summary: Update a customer request
+      description: Updates the status of a customer request, for example from open to resolved.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomerRequestRequest"
+      responses:
+        "200":
+          description: Customer request updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffCustomerRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/menu-items:
+    post:
+      tags:
+        - Staff
+      summary: Create a menu item
+      description: Creates a new menu item for the authenticated staff user's restaurant.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMenuItemRequest"
+      responses:
+        "201":
+          description: Menu item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/staff/menu-items/{menuItemId}:
+    patch:
+      tags:
+        - Staff
+      summary: Update a menu item
+      description: Updates menu item information such as price, description, ingredients, image, or availability.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/MenuItemIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMenuItemRequest"
+      responses:
+        "200":
+          description: Menu item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/menu-items/{menuItemId}/allergens:
+    put:
+      tags:
+        - Staff
+      summary: Replace allergens for a menu item
+      description: Replaces the allergen list connected to a menu item.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/MenuItemIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - allergenIds
+              properties:
+                allergenIds:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 3, 5]
+      responses:
+        "200":
+          description: Menu item allergens updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  menuItemId:
+                    type: integer
+                    example: 4
+                  allergens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Allergen"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/knowledge-base:
+    get:
+      tags:
+        - Knowledge Base
+      summary: Get restaurant knowledge base entries
+      description: Retrieves restaurant-specific knowledge used for grounded AI responses.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Knowledge base entries retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/KnowledgeBaseEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags:
+        - Knowledge Base
+      summary: Create a restaurant knowledge base entry
+      description: Creates a new knowledge base entry for restaurant-specific rules or information.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKnowledgeBaseEntryRequest"
+      responses:
+        "201":
+          description: Knowledge base entry created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeBaseEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/staff/knowledge-base/{entryId}:
+    patch:
+      tags:
+        - Knowledge Base
+      summary: Update a restaurant knowledge base entry
+      description: Updates restaurant-specific knowledge used by the AI assistant.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/KnowledgeBaseEntryIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateKnowledgeBaseEntryRequest"
+      responses:
+        "200":
+          description: Knowledge base entry updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeBaseEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/ai-response-logs:
+    get:
+      tags:
+        - AI Logs
+      summary: Get AI response logs
+      description: Retrieves AI response logs for debugging and thesis evaluation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: query
+          required: false
+          schema:
+            type: integer
+          example: 12
+        - name: handoverRequired
+          in: query
+          required: false
+          schema:
+            type: boolean
+          example: true
+      responses:
+        "200":
+          description: AI response logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AIResponseLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/staff/ai-response-logs/{logId}:
+    get:
+      tags:
+        - AI Logs
+      summary: Get one AI response log
+      description: Retrieves details of one AI response log.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AIResponseLogIdPath"
+      responses:
+        "200":
+          description: AI response log retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AIResponseLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    SessionTokenPath:
+      name: sessionToken
+      in: path
+      required: true
+      description: Token used to identify a customer session
+      schema:
+        type: string
+      example: "sess_7f9d2a8c"
+
+    SessionIdPath:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 12
+
+    RestaurantIdPath:
+      name: restaurantId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+
+    MenuItemIdPath:
+      name: menuItemId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 4
+
+    RequestIdPath:
+      name: requestId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 9
+
+    KnowledgeBaseEntryIdPath:
+      name: entryId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 5
+
+    AIResponseLogIdPath:
+      name: logId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 20
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: "Invalid request body."
+            code: "BAD_REQUEST"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: "Authentication is required."
+            code: "UNAUTHORIZED"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: "Resource not found."
+            code: "NOT_FOUND"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - message
+        - code
+      properties:
+        message:
+          type: string
+          example: "Resource not found."
+        code:
+          type: string
+          example: "NOT_FOUND"
+
+    SessionStatus:
+      type: string
+      enum:
+        - active
+        - closed
+        - expired
+        - waiting_staff
+      example: active
+
+    RequestStatus:
+      type: string
+      enum:
+        - open
+        - in_progress
+        - resolved
+        - cancelled
+      example: open
+
+    RequestType:
+      type: string
+      enum:
+        - staff_help
+        - payment
+        - complaint
+        - allergy_support
+        - handover
+        - other
+      example: payment
+
+    SenderType:
+      type: string
+      enum:
+        - customer
+        - ai
+        - staff
+        - system
+      example: customer
+
+    StaffRole:
+      type: string
+      enum:
+        - admin
+        - manager
+        - staff
+      example: staff
+
+    Restaurant:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Urban Bistro"
+        description:
+          type: string
+          example: "A casual restaurant serving lunch and dinner."
+        address:
+          type: string
+          example: "Example Street 1, Oulu"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RestaurantTable:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 3
+        restaurantId:
+          type: integer
+          example: 1
+        tableNumber:
+          type: string
+          example: "5"
+        qrCodeToken:
+          type: string
+          example: "qr_table_5_token"
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CustomerSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12
+        restaurantId:
+          type: integer
+          example: 1
+        tableId:
+          type: integer
+          example: 3
+        sessionToken:
+          type: string
+          example: "sess_7f9d2a8c"
+        status:
+          $ref: "#/components/schemas/SessionStatus"
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StaffSessionSummary:
+      type: object
+      description: Customer session information prepared for the staff dashboard.
+      properties:
+        id:
+          type: integer
+          example: 12
+        restaurantId:
+          type: integer
+          example: 1
+        tableId:
+          type: integer
+          example: 3
+        tableNumber:
+          type: string
+          example: "5"
+        status:
+          $ref: "#/components/schemas/SessionStatus"
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StaffUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 2
+        restaurantId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Restaurant Staff"
+        email:
+          type: string
+          format: email
+          example: "staff@example.com"
+        role:
+          $ref: "#/components/schemas/StaffRole"
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 30
+        sessionId:
+          type: integer
+          example: 12
+        senderType:
+          $ref: "#/components/schemas/SenderType"
+        messageContent:
+          type: string
+          example: "I am allergic to sesame. Can you recommend a vegetarian dish?"
+        createdAt:
+          type: string
+          format: date-time
+
+    CustomerRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 9
+        sessionId:
+          type: integer
+          example: 12
+        requestType:
+          $ref: "#/components/schemas/RequestType"
+        status:
+          $ref: "#/components/schemas/RequestStatus"
+        description:
+          type: string
+          example: "Customer asked for payment."
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StaffCustomerRequest:
+      type: object
+      description: Customer request information prepared for the staff dashboard.
+      properties:
+        id:
+          type: integer
+          example: 9
+        sessionId:
+          type: integer
+          example: 12
+        restaurantId:
+          type: integer
+          example: 1
+        tableId:
+          type: integer
+          example: 3
+        tableNumber:
+          type: string
+          example: "5"
+        requestType:
+          $ref: "#/components/schemas/RequestType"
+        status:
+          $ref: "#/components/schemas/RequestStatus"
+        description:
+          type: string
+          example: "Customer asked for payment."
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 4
+        restaurantId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Mushroom Risotto"
+        description:
+          type: string
+          example: "Creamy risotto with mushrooms and parmesan."
+        category:
+          type: string
+          example: "main"
+        price:
+          type: number
+          format: float
+          example: 14.90
+        ingredients:
+          type: string
+          example: "rice, mushroom, parmesan, cream"
+        imageUrl:
+          type: string
+          nullable: true
+          example: "https://example.com/images/mushroom-risotto.jpg"
+        isAvailable:
+          type: boolean
+          example: true
+        isVegetarian:
+          type: boolean
+          example: true
+        isVegan:
+          type: boolean
+          example: false
+        allergens:
+          type: array
+          items:
+            $ref: "#/components/schemas/Allergen"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Allergen:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 3
+        name:
+          type: string
+          example: "milk"
+        description:
+          type: string
+          example: "Contains milk or milk-based ingredients."
+
+    KnowledgeBaseEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        restaurantId:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Payment policy"
+        content:
+          type: string
+          example: "Customers must ask staff for payment. Payment cannot be completed through the AI chat."
+        category:
+          type: string
+          example: "payment"
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AIResponseLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 20
+        sessionId:
+          type: integer
+          nullable: true
+          example: 12
+        customerMessageId:
+          type: integer
+          nullable: true
+          example: 29
+        aiMessageId:
+          type: integer
+          nullable: true
+          example: 30
+        modelName:
+          type: string
+          example: "gemini-2.5-flash-lite"
+        retrievedContext:
+          type: string
+          example: "Menu items: Mushroom Risotto, allergens: milk. Restaurant rule: ask staff for severe allergy confirmation."
+        prompt:
+          type: string
+          example: "Customer asks for a vegetarian dish without sesame. Use only the provided restaurant data."
+        response:
+          type: string
+          example: "The mushroom risotto is vegetarian and does not contain sesame according to the current menu data."
+        handoverRequired:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateCustomerSessionRequest:
+      type: object
+      required:
+        - qrCodeToken
+      properties:
+        qrCodeToken:
+          type: string
+          example: "qr_table_5_token"
+
+    CreateCustomerSessionResponse:
+      type: object
+      properties:
+        sessionToken:
+          type: string
+          example: "sess_7f9d2a8c"
+        session:
+          $ref: "#/components/schemas/CustomerSession"
+        restaurant:
+          $ref: "#/components/schemas/Restaurant"
+        table:
+          $ref: "#/components/schemas/RestaurantTable"
+
+    CreateCustomerRequestRequest:
+      type: object
+      required:
+        - requestType
+      properties:
+        requestType:
+          $ref: "#/components/schemas/RequestType"
+        description:
+          type: string
+          example: "Customer asks for the bill."
+
+    CreateCustomerRequestResponse:
+      type: object
+      properties:
+        request:
+          $ref: "#/components/schemas/CustomerRequest"
+        sessionStatus:
+          $ref: "#/components/schemas/SessionStatus"
+
+    SendChatMessageRequest:
+      type: object
+      required:
+        - sessionToken
+        - message
+      properties:
+        sessionToken:
+          type: string
+          example: "sess_7f9d2a8c"
+        message:
+          type: string
+          example: "I am allergic to sesame. Can you recommend a vegetarian main dish?"
+
+    SendChatMessageResponse:
+      type: object
+      required:
+        - reply
+        - handoverRequired
+        - requestId
+        - sessionStatus
+      properties:
+        reply:
+          type: string
+          example: "Based on the current menu data, the mushroom risotto is vegetarian and does not contain sesame. Please confirm with staff if the allergy is severe."
+        handoverRequired:
+          type: boolean
+          example: false
+        requestId:
+          type: integer
+          nullable: true
+          example: null
+        sessionStatus:
+          $ref: "#/components/schemas/SessionStatus"
+        aiMessage:
+          $ref: "#/components/schemas/ChatMessage"
+
+    StaffLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "staff@example.com"
+        password:
+          type: string
+          format: password
+          example: "password123"
+
+    StaffLoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        staffUser:
+          $ref: "#/components/schemas/StaffUser"
+
+    StaffMessageRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: "A staff member will come to your table shortly."
+
+    UpdateCustomerRequestRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/RequestStatus"
+        description:
+          type: string
+          example: "Payment request handled by staff."
+
+    CreateMenuItemRequest:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        name:
+          type: string
+          example: "Mushroom Risotto"
+        description:
+          type: string
+          example: "Creamy risotto with mushrooms and parmesan."
+        category:
+          type: string
+          example: "main"
+        price:
+          type: number
+          format: float
+          example: 14.90
+        ingredients:
+          type: string
+          example: "rice, mushroom, parmesan, cream"
+        imageUrl:
+          type: string
+          nullable: true
+          example: "https://example.com/images/mushroom-risotto.jpg"
+        isAvailable:
+          type: boolean
+          example: true
+        isVegetarian:
+          type: boolean
+          example: true
+        isVegan:
+          type: boolean
+          example: false
+        allergenIds:
+          type: array
+          items:
+            type: integer
+          example: [3]
+
+    UpdateMenuItemRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Mushroom Risotto"
+        description:
+          type: string
+          example: "Creamy risotto with mushrooms and parmesan."
+        category:
+          type: string
+          example: "main"
+        price:
+          type: number
+          format: float
+          example: 14.90
+        ingredients:
+          type: string
+          example: "rice, mushroom, parmesan, cream"
+        imageUrl:
+          type: string
+          nullable: true
+          example: "https://example.com/images/mushroom-risotto.jpg"
+        isAvailable:
+          type: boolean
+          example: true
+        isVegetarian:
+          type: boolean
+          example: true
+        isVegan:
+          type: boolean
+          example: false
+
+    CreateKnowledgeBaseEntryRequest:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+          example: "Payment policy"
+        content:
+          type: string
+          example: "Payment must be handled by staff."
+        category:
+          type: string
+          example: "payment"
+        isActive:
+          type: boolean
+          example: true
+
+    UpdateKnowledgeBaseEntryRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: "Payment policy"
+        content:
+          type: string
+          example: "Payment must be handled by staff."
+        category:
+          type: string
+          example: "payment"
+        isActive:
+          type: boolean
+          example: true
