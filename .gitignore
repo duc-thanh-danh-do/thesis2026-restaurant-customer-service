@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.next/
+.claude/
+node_modules/
+dist/
+coverage/
+next-env.d.ts
+tsconfig.tsbuildinfo
+*.log
