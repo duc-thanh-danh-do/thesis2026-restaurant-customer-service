@@ -295,6 +295,35 @@ async function main() {
   }
 
   console.log("Seed data created for TestPizza.");
+
+  // NEW: Create a real test order for the Staff Dashboard
+  // Orders must belong to a session, so fetch the first existing customer session
+  const existingSession = await prisma.customerSession.findFirst();
+
+  if (existingSession) {
+    // Create a real order with initial status "Preparing"
+    const newOrder = await prisma.order.create({
+      data: {
+        sessionId: existingSession.id,
+        status: "Preparing",
+        total: 26.5,
+
+        orderItems: {
+          create: [
+            { name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
+            { name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
+          ],
+        },
+      },
+    });
+    console.log(
+      `Order seed data created successfully! Order ID: ${newOrder.id}`
+    );
+  } else {
+    console.log(
+      "Notice: No CustomerSession found in the database. Cannot create order. Please ensure session data is seeded first!"
+    );
+  }
 }
 
 main()
