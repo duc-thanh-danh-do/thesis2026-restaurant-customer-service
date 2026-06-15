@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import RequestCard from "@/components/staff/RequestCard";
 import {
   AlertTriangle,
   ChevronRight,
@@ -389,33 +390,6 @@ function OrderCard({ order }: { order: typeof mockOrder }) {
   );
 }
 
-function RequestCard({ request }: { request: typeof mockRequests[0] }) {
-  const activeBadge = request.status;
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-slate-700">{request.text}</span>
-        <span className="text-xs text-slate-400">{request.time}</span>
-      </div>
-      <div className="flex gap-1.5">
-        {request.badges.map((badge) => (
-          <span
-            key={badge}
-            className={`text-xs px-2 py-0.5 rounded-full ${
-              badge === activeBadge
-                ? "bg-slate-700 text-white"
-                : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {badge}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function DetailsPanel({
   tableId,
 }: {
@@ -443,7 +417,12 @@ function DetailsPanel({
           <h3 className="text-xs font-medium text-slate-400 uppercase mb-3">
             Service requests
           </h3>
-          <RequestCard request={mockRequests[0]} />
+          <RequestCard 
+            id={1}  
+            text={mockRequests[0].text} 
+            time={mockRequests[0].time} 
+            initialStatus={mockRequests[0].status} 
+          />
         </div>
       </div>
     </div>
