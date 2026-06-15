@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { Check, Plus } from "lucide-react";
-import { updateOrderStatus, updateItemQuantityAction } from "@/actions/customer-order.action";
+import {
+  updateOrderStatus,
+  updateItemQuantityAction,
+} from "@/actions/customer-order.action";
 import { Button } from "@/components/ui/button";
 
 const stepStatuses = ["Placed", "Preparing", "Ready", "Served"];
@@ -29,16 +32,22 @@ export default function OrderCard({
   initialStatus,
   items,
 }: OrderCardProps) {
-
   const [optimisticStatus, setOptimisticStatus] = useState(initialStatus);
   const [optimisticItems, setOptimisticItems] = useState(items);
-  const [optimisticTotal, setOptimisticTotal] = useState(total);
-  
+  const initialCalculatedTotal = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+  const [optimisticTotal, setOptimisticTotal] = useState(
+    initialCalculatedTotal
+  );
+
   const [isPending, startTransition] = useTransition();
 
-  const activeStep = stepStatuses.indexOf(optimisticStatus) >= 0 
-    ? stepStatuses.indexOf(optimisticStatus) 
-    : 0;
+  const activeStep =
+    stepStatuses.indexOf(optimisticStatus) >= 0
+      ? stepStatuses.indexOf(optimisticStatus)
+      : 0;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -63,7 +72,7 @@ export default function OrderCard({
             {optimisticStatus}
           </span>
         </div>
-        
+
         {/* Progress Bar */}
         <div className="flex items-center gap-1 w-full">
           {stepStatuses.map((step, i) => (
@@ -72,7 +81,7 @@ export default function OrderCard({
               disabled={isPending}
               onClick={() => {
                 startTransition(async () => {
-                  setOptimisticStatus(step); 
+                  setOptimisticStatus(step);
                   const numericId = parseInt(id.replace(/[^0-9]/g, "")) || 1;
                   await updateOrderStatus(numericId, step);
                 });
@@ -105,13 +114,10 @@ export default function OrderCard({
             </button>
           ))}
         </div>
-        
+
         <div className="flex justify-between mt-1">
           {stepStatuses.map((step) => (
-            <span
-              key={step}
-              className="text-[10px] text-slate-400 uppercase"
-            >
+            <span key={step} className="text-[10px] text-slate-400 uppercase">
               {step}
             </span>
           ))}
@@ -121,12 +127,13 @@ export default function OrderCard({
       {/* Items Section */}
       <div className="p-4">
         <div className="space-y-3">
-
           {optimisticItems.map((item, i) => (
-            <div key={item.id || i} className="flex items-center justify-between">
+            <div
+              key={item.id || i}
+              className="flex items-center justify-between"
+            >
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1">
-                  
                   {/* Minus*/}
                   <Button
                     variant="outline"
@@ -134,28 +141,41 @@ export default function OrderCard({
                     disabled={isPending}
                     onClick={() => {
                       const newQuantity = item.quantity - 1;
-                      
- 
-                      if (newQuantity <= 0) {
-                        setOptimisticItems(prev => prev.filter(x => x.id !== item.id));
-                      } else {
-                        setOptimisticItems(prev => prev.map(x => x.id === item.id ? { ...x, quantity: newQuantity } : x));
-                      }
-                      setOptimisticTotal(prev => prev - item.price);
 
-                 
+                      if (newQuantity <= 0) {
+                        setOptimisticItems((prev) =>
+                          prev.filter((x) => x.id !== item.id)
+                        );
+                      } else {
+                        setOptimisticItems((prev) =>
+                          prev.map((x) =>
+                            x.id === item.id
+                              ? { ...x, quantity: newQuantity }
+                              : x
+                          )
+                        );
+                      }
+                      setOptimisticTotal((prev) => prev - item.price);
+
                       startTransition(async () => {
-                        const numericOrderId = parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        await updateItemQuantityAction(numericOrderId, item.id, newQuantity);
+                        const numericOrderId =
+                          parseInt(id.replace(/[^0-9]/g, "")) || 1;
+                        await updateItemQuantityAction(
+                          numericOrderId,
+                          item.id,
+                          newQuantity
+                        );
                       });
                     }}
                     className="h-6 w-6 rounded-full border-slate-300"
                   >
                     <span className="text-xs">-</span>
                   </Button>
-                  
-                  <span className="w-6 text-center text-sm">{item.quantity}</span>
-                  
+
+                  <span className="w-6 text-center text-sm">
+                    {item.quantity}
+                  </span>
+
                   {/* plus */}
                   <Button
                     variant="outline"
@@ -164,21 +184,27 @@ export default function OrderCard({
                     onClick={() => {
                       const newQuantity = item.quantity + 1;
 
- 
-                      setOptimisticItems(prev => prev.map(x => x.id === item.id ? { ...x, quantity: newQuantity } : x));
-                      setOptimisticTotal(prev => prev + item.price);
-
+                      setOptimisticItems((prev) =>
+                        prev.map((x) =>
+                          x.id === item.id ? { ...x, quantity: newQuantity } : x
+                        )
+                      );
+                      setOptimisticTotal((prev) => prev + item.price);
 
                       startTransition(async () => {
-                        const numericOrderId = parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        await updateItemQuantityAction(numericOrderId, item.id, newQuantity);
+                        const numericOrderId =
+                          parseInt(id.replace(/[^0-9]/g, "")) || 1;
+                        await updateItemQuantityAction(
+                          numericOrderId,
+                          item.id,
+                          newQuantity
+                        );
                       });
                     }}
                     className="h-6 w-6 rounded-full border-slate-300"
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
-
                 </div>
                 <span className="text-sm text-slate-700">{item.name}</span>
               </div>
