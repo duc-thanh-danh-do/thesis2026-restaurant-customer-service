@@ -107,8 +107,8 @@ const mockOrder = {
   total: 26.5,
   status: "Preparing" as const,
   items: [
-    { name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
-    { name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
+    { id: 1, name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
+    { id: 2, name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
   ],
 };
 
