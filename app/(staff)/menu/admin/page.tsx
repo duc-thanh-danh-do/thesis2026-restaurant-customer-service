@@ -1,39 +1,63 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
 import { Plus, Pencil, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MENU_ITEMS } from "@/data/mock-data";
 import MenuAdminHeader from "@/components/menu/MenuManagementHeader";
 import AddDishDrawer from "@/components/menu/AddDishDrawer";
+import { getMenuItemsAction } from "@/actions/menu-item.action";
 
 export default function MenuAdminPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const menuItemsByCategory = MENU_ITEMS.reduce((acc, item) => {
-    if (!acc[item.category]) {
-      acc[item.category] = [];
-    }
-    acc[item.category].push(item);
-    return acc;
-  }, {} as Record<string, typeof MENU_ITEMS>);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const categoryOrder = ["STARTERS", "MAINS", "SIDES", "DESSERTS", "DRINKS"];
+  const fetchItems = async () => {
+    setIsLoading(true);
+    const data = await getMenuItemsAction();
+    setMenuItems(data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchItems();
+  }, []);
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    fetchItems();
+  };
+
+  const menuItemsByCategory = menuItems.reduce((acc, item) => {
+    const cat = item.category || "OTHER";
+    if (!acc[cat]) {
+      acc[cat] = [];
+    }
+    acc[cat].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const categoryOrder = [
+    "STARTERS",
+    "MAINS",
+    "SIDES",
+    "DESSERTS",
+    "DRINKS",
+    "OTHER",
+  ];
 
   return (
     <div className="flex-1 flex flex-col h-screen w-full bg-[#f5f9fc] overflow-hidden relative">
-      {/* Header */}
       <MenuAdminHeader />
 
-      {/* Dishes */}
       <div className="flex-1 overflow-y-auto px-6 py-6 w-full">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              DISHES
+              DISHES {isLoading ? "(Loading...)" : `(${menuItems.length})`}
             </div>
-
             <Button
               onClick={() => setIsDrawerOpen(true)}
               className="bg-[#142653] hover:bg-[#13275a] text-white rounded-full px-4 py-2"
@@ -44,6 +68,12 @@ export default function MenuAdminPage() {
           </div>
 
           <div className="space-y-6">
+            {!isLoading && menuItems.length === 0 && (
+              <p className="text-slate-500 text-sm text-center py-10">
+                No dishes found. Click "Add dish" to create one!
+              </p>
+            )}
+
             {categoryOrder.map((category) => {
               const items = menuItemsByCategory[category] || [];
               if (items.length === 0) return null;
@@ -54,7 +84,7 @@ export default function MenuAdminPage() {
                     {category}
                   </div>
                   <div className="space-y-2">
-                    {items.map((item) => (
+                    {items.map((item: { id: Key | null | undefined; name: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; price: number; isVegetarian: any; isVegan: any; }) => (
                       <Card
                         key={item.id}
                         className="p-4 bg-white border border-[#d5e1ec] rounded-[20px]"
@@ -69,8 +99,9 @@ export default function MenuAdminPage() {
                                 {item.name}
                               </div>
                               <div className="text-sm text-gray-600">
-                                €{item.price.toFixed(2)} ·{" "}
-                                {item.tags.join(", ").toLowerCase()}
+                                €{item.price.toFixed(2)}
+                                {item.isVegetarian && " · vegetarian"}
+                                {item.isVegan && " · vegan"}
                               </div>
                             </div>
                           </div>
@@ -101,11 +132,7 @@ export default function MenuAdminPage() {
         </div>
       </div>
 
-      {/* AddDish drawer */}
-      <AddDishDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-      />
+      <AddDishDrawer isOpen={isDrawerOpen} onClose={handleCloseDrawer} />
     </div>
   );
 }
