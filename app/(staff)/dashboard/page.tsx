@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import RequestCard from "@/components/staff/RequestCard";
 import OrderCard from "@/components/staff/OrderCard";
 import { getTestOrder } from "@/actions/customer-order.action";
+import { getTableRequestsAction } from "@/actions/customer-request.action";
 import {
   AlertTriangle,
   ChevronRight,
@@ -279,15 +280,22 @@ function ChatPanel({ tableId }: { tableId: string | null }) {
 
 function DetailsPanel({ tableId }: { tableId: string | null }) {
   const [realOrder, setRealOrder] = useState<typeof mockOrder | null>(null);
+  const [realRequests, setRealRequests] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!tableId) return;
+
+    // get orders
     getTestOrder().then((data) => {
       if (data) {
         setRealOrder(data as any);
       }
     });
-  }, []);
 
+    getTableRequestsAction(tableId).then((data) => {
+      setRealRequests(data);
+    });
+  }, [tableId]);
   if (!tableId) {
     return (
       <div className="flex min-h-[320px] h-full items-center justify-center rounded-xl bg-slate-50">
@@ -299,6 +307,7 @@ function DetailsPanel({ tableId }: { tableId: string | null }) {
   return (
     <div className="h-full overflow-auto rounded-xl bg-slate-50 p-4">
       <div className="space-y-4">
+        {/* Orders */}
         <div>
           <h3 className="text-xs font-medium text-slate-400 uppercase mb-3">
             Orders
@@ -318,16 +327,38 @@ function DetailsPanel({ tableId }: { tableId: string | null }) {
           )}
         </div>
 
+        {/* Service requests  */}
         <div>
           <h3 className="text-xs font-medium text-slate-400 uppercase mb-3">
             Service requests
           </h3>
-          <RequestCard
-            id={1}
-            text={mockRequests[0].text}
-            time={mockRequests[0].time}
-            initialStatus={mockRequests[0].status}
-          />
+          <div className="space-y-3">
+            {realRequests.length === 0 ? (
+              <div className="text-sm text-slate-400 p-4 border border-dashed border-slate-200 rounded-lg text-center">
+                No active requests for Table {tableId}
+              </div>
+            ) : (
+              realRequests.map((req) => {
+                const reqType = req.requestType.replace("_", " ");
+                const timeStr = req.createdAt
+                  ? new Date(req.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "Just now";
+
+                return (
+                  <RequestCard
+                    key={req.id}
+                    id={req.id}
+                    text={reqType}
+                    time={timeStr}
+                    initialStatus={req.status}
+                  />
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     </div>
