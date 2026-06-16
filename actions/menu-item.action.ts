@@ -60,3 +60,41 @@ export async function getMenuItemsAction() {
     return [];
   }
 }
+
+// Delete Menu
+export async function deleteMenuItemAction(id: number) {
+  try {
+    await prisma.menuItemAllergen.deleteMany({
+      where: { menuItemId: id },
+    });
+
+    await prisma.menuItem.delete({
+      where: { id },
+    });
+
+    revalidatePath("/menu/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete menu:", error);
+    return { success: false, error: "Failed to delete dish" };
+  }
+}
+
+// Menu availability
+export async function toggleMenuItemAvailabilityAction(
+  id: number,
+  currentStatus: boolean
+) {
+  try {
+    await prisma.menuItem.update({
+      where: { id },
+      data: { isAvailable: !currentStatus },
+    });
+
+    revalidatePath("/menu/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to change the availability:", error);
+    return { success: false, error: "Failed to toggle availability" };
+  }
+}
