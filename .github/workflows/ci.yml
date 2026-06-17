@@ -1,36 +1,22 @@
-name: CI Pipeline
+name: CI
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+  push:
+    branches:
+      - main
 
 jobs:
-  build-and-test:
+  validate:
     runs-on: ubuntu-latest
-    
-    # All codes are in folder client
-    defaults:
-      run:
-        working-directory: ./client
-
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18.x'
-        cache: 'npm'
-        cache-dependency-path: './client/package-lock.json'
-
-    - name: Install Dependencies
-      run: npm install
-
-    - name: Run Linter
-      run: npm run lint
-
-    - name: Run Type Check
-      run: npm run typecheck
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run prisma:validate
+      - run: npm run build
