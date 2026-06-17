@@ -75,7 +75,7 @@ export async function deleteMenuItemAction(id: number) {
     revalidatePath("/menu/admin");
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete menu:", error);
+    console.error("Failed to delete dish:", error);
     return { success: false, error: "Failed to delete dish" };
   }
 }
@@ -96,5 +96,29 @@ export async function toggleMenuItemAvailabilityAction(
   } catch (error) {
     console.error("Failed to change the availability:", error);
     return { success: false, error: "Failed to toggle availability" };
+  }
+}
+
+// Edit MenuItem
+export async function editMenuItemAction(id: number, data: any) {
+  try {
+    const editItem = await prisma.menuItem.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        category: data.category,
+        isVegetarian: data.isVegetarian,
+        isVegan: data.isVegan,
+        ingredients: data.ingredients,
+      },
+    });
+
+    revalidatePath("/menu/admin");
+    return { success: true, data: editItem };
+  } catch (error) {
+    console.error("Failed to update dish:", error);
+    return { success: false, error: "Failed to update dish" };
   }
 }

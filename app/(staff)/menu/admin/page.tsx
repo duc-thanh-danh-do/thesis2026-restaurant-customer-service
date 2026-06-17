@@ -44,6 +44,8 @@ export default function MenuAdminPage() {
     name: "",
   });
 
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+
   const fetchItems = async () => {
     setIsLoading(true);
     const data = await getMenuItemsAction();
@@ -119,7 +121,10 @@ export default function MenuAdminPage() {
               DISHES {isLoading ? "(Loading...)" : `(${menuItems.length})`}
             </div>
             <Button
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={() => {
+                setEditingItem(null);
+                setIsDrawerOpen(true);
+              }}
               className="bg-[#142653] hover:bg-[#13275a] text-white rounded-full px-4 py-2"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -179,6 +184,10 @@ export default function MenuAdminPage() {
                               variant="outline"
                               size="sm"
                               className="rounded-full px-3 py-1 text-sm h-8"
+                              onClick={() => {
+                                setEditingItem(item);
+                                setIsDrawerOpen(true);
+                              }}
                             >
                               <Pencil className="h-3 w-3 sm:mr-1" />
                               <span className="hidden sm:inline">Edit</span>
@@ -222,7 +231,11 @@ export default function MenuAdminPage() {
         </div>
       </div>
 
-      <AddDishDrawer isOpen={isDrawerOpen} onClose={handleCloseDrawer} />
+      <AddDishDrawer
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        initialData={editingItem}
+      />
 
       <DeleteConfirmModal
         isOpen={deleteModal.isOpen}
