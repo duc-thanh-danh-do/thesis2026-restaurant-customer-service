@@ -13,6 +13,28 @@ interface CreateMenuItemInput {
   isVegan: boolean;
 }
 
+type DecimalLike = number | string | { toString(): string };
+
+type MenuItemRow = {
+  id: number;
+  restaurantId: number;
+  name: string;
+  description: string | null;
+  category: string | null;
+  price: DecimalLike;
+  ingredients: string | null;
+  imageUrl: string | null;
+  isAvailable: boolean;
+  isVegetarian: boolean;
+  isVegan: boolean;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+};
+
+type MenuItemActionResult = Omit<MenuItemRow, "price"> & {
+  price: number;
+};
+
 export async function createMenuItemAction(data: CreateMenuItemInput) {
   try {
     const newItem = await prisma.menuItem.create({
@@ -44,12 +66,12 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
   }
 }
 
-export async function getMenuItemsAction() {
+export async function getMenuItemsAction(): Promise<MenuItemActionResult[]> {
   try {
-    const items = await prisma.menuItem.findMany({
+    const items = (await prisma.menuItem.findMany({
       where: { restaurantId: 1 },
       orderBy: { id: "desc" },
-    });
+    })) as MenuItemRow[];
 
     return items.map((item) => ({
       ...item,
