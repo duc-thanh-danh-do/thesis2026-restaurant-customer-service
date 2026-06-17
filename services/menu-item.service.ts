@@ -1,10 +1,13 @@
 import type { MenuItemsResponse } from "@/types/menu-item";
-import { findMenuItems, type MenuItemFilters } from "@/repositories/menu-item.repository";
+import {
+  findMenuItems,
+  type MenuItemFilters,
+} from "@/repositories/menu-item.repository";
 import { fallbackMenuItems, isDatabaseUnavailable } from "@/lib/fallback-data";
 
 export async function getMenuItems(
   restaurantId: number,
-  filters: MenuItemFilters,
+  filters: MenuItemFilters
 ): Promise<MenuItemsResponse> {
   try {
     const menuItems = await findMenuItems(restaurantId, filters);
@@ -37,7 +40,8 @@ export async function getMenuItems(
     return {
       menuItems: fallbackMenuItems.filter((item) => {
         if (item.restaurantId !== restaurantId) return false;
-        if (filters.category && item.category !== filters.category) return false;
+        if (filters.category && item.category !== filters.category)
+          return false;
         if (
           filters.isAvailable !== undefined &&
           item.isAvailable !== filters.isAvailable

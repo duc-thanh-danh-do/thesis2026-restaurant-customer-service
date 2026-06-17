@@ -18,14 +18,36 @@ Fresh Next.js and Prisma rebuild of the restaurant customer-service prototype.
 - Customer chat: `/session/[sessionToken]`
 - Grounded AI response logging through Prisma
 - Customer menu browsing: `/session/[sessionToken]/menu`
-- Staff dashboard, requests, tables, menu, knowledge-base, and AI-log scaffolds
+- **Staff dashboard: Real-time order management with Optimistic UI updates**
+- Scaffolds for: requests, tables, menu, knowledge-base, and AI-logs
 
 ## Local Setup
 
+1. Clone the repository and install dependencies:
+
 ```bash
 npm install
-npm run prisma:generate
-npm run dev
 ```
 
-Copy `.env.example` to `.env` and set `DATABASE_URL`. Add `GEMINI_API_KEY` to enable live Gemini responses.
+2. Copy .env.example to .env and set your variables:
+
+DATABASE_URL (Required for Prisma/PostgreSQL)
+
+GEMINI_API_KEY (Required for live Gemini responses)
+
+3. Initialize the database and seed test data:
+
+# Apply database migrations to your PostgreSQL instance
+
+npx prisma migrate dev
+
+# Seed the database with mock restaurant, menu, and test order data
+
+npx tsx prisma/seed.ts
+
+# Generate the Prisma Client
+
+npx prisma generate
+
+4. Start the development server:
+   npm run dev

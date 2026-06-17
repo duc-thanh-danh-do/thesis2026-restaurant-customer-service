@@ -12,7 +12,7 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg(
     new Pool({
       connectionString: datasourceUrl,
-    }),
+    })
   ),
 });
 
@@ -35,7 +35,8 @@ async function upsertRestaurant() {
 
   const data = {
     name: "TestPizza",
-    description: "Temporary pizza restaurant for testing the AI chat prototype.",
+    description:
+      "Temporary pizza restaurant for testing the AI chat prototype.",
     address: "Test Street 1",
   };
 
@@ -81,7 +82,7 @@ async function upsertMenuItem(restaurantId: number, item: MenuItemSeed) {
 
 async function upsertKnowledgeBaseRecord(
   restaurantId: number,
-  data: Prisma.RestaurantKnowledgeBaseUncheckedCreateInput,
+  data: Prisma.RestaurantKnowledgeBaseUncheckedCreateInput
 ) {
   const existing = await prisma.restaurantKnowledgeBase.findFirst({
     where: {
@@ -125,7 +126,10 @@ async function main() {
     ["Milk", "Found in mozzarella, parmesan, and other dairy ingredients."],
     ["Egg", "May be present in some sauces, doughs, or toppings."],
     ["Soy", "May be present in vegan cheese, sauces, or processed toppings."],
-    ["Sesame", "May be present in breads, crust toppings, or shared preparation areas."],
+    [
+      "Sesame",
+      "May be present in breads, crust toppings, or shared preparation areas.",
+    ],
     ["Fish", "Found in tuna and other seafood toppings."],
   ];
 
@@ -144,7 +148,8 @@ async function main() {
   const menuItems: MenuItemSeed[] = [
     {
       name: "Margherita Pizza",
-      description: "Classic pizza with tomato sauce, mozzarella, basil, and olive oil.",
+      description:
+        "Classic pizza with tomato sauce, mozzarella, basil, and olive oil.",
       category: "Pizza",
       price: "11.90",
       ingredients: "Pizza dough, tomato sauce, mozzarella, basil, olive oil",
@@ -166,10 +171,12 @@ async function main() {
     },
     {
       name: "Vegan Garden Pizza",
-      description: "Plant-based pizza with seasonal vegetables and vegan cheese.",
+      description:
+        "Plant-based pizza with seasonal vegetables and vegan cheese.",
       category: "Pizza",
       price: "12.90",
-      ingredients: "Pizza dough, tomato sauce, vegan cheese, bell pepper, mushroom, red onion, olives",
+      ingredients:
+        "Pizza dough, tomato sauce, vegan cheese, bell pepper, mushroom, red onion, olives",
       isAvailable: true,
       isVegetarian: true,
       isVegan: true,
@@ -180,7 +187,8 @@ async function main() {
       description: "Tomato sauce, mozzarella, tuna, red onion, and capers.",
       category: "Pizza",
       price: "14.50",
-      ingredients: "Pizza dough, tomato sauce, mozzarella, tuna, red onion, capers",
+      ingredients:
+        "Pizza dough, tomato sauce, mozzarella, tuna, red onion, capers",
       isAvailable: true,
       isVegetarian: false,
       isVegan: false,
@@ -188,10 +196,12 @@ async function main() {
     },
     {
       name: "Garlic Bread",
-      description: "Oven-baked bread with garlic butter, herbs, and a light egg wash.",
+      description:
+        "Oven-baked bread with garlic butter, herbs, and a light egg wash.",
       category: "Side",
       price: "5.90",
-      ingredients: "Bread, garlic butter, egg wash, parsley, sesame seed topping",
+      ingredients:
+        "Bread, garlic butter, egg wash, parsley, sesame seed topping",
       isAvailable: true,
       isVegetarian: true,
       isVegan: false,
@@ -204,7 +214,8 @@ async function main() {
 
     for (const allergenName of item.allergens) {
       const allergen = allergens.get(allergenName);
-      if (!allergen) throw new Error(`Missing allergen seed data for ${allergenName}`);
+      if (!allergen)
+        throw new Error(`Missing allergen seed data for ${allergenName}`);
 
       await prisma.menuItemAllergen.upsert({
         where: {
@@ -225,7 +236,8 @@ async function main() {
   await upsertKnowledgeBaseRecord(restaurant.id, {
     restaurantId: restaurant.id,
     title: "Opening hours",
-    content: "TestPizza is open Monday to Saturday from 11:00 to 22:00 and Sunday from 12:00 to 20:00.",
+    content:
+      "TestPizza is open Monday to Saturday from 11:00 to 22:00 and Sunday from 12:00 to 20:00.",
     category: "opening_hours",
     isActive: true,
   });
@@ -233,7 +245,8 @@ async function main() {
   await upsertKnowledgeBaseRecord(restaurant.id, {
     restaurantId: restaurant.id,
     title: "Payment options",
-    content: "Customers can pay by card, mobile payment, or cash. Receipts are available on request.",
+    content:
+      "Customers can pay by card, mobile payment, or cash. Receipts are available on request.",
     category: "payment",
     isActive: true,
   });
@@ -241,12 +254,76 @@ async function main() {
   await upsertKnowledgeBaseRecord(restaurant.id, {
     restaurantId: restaurant.id,
     title: "Allergy support",
-    content: "For allergy questions, the AI should summarize known allergens and ask staff to confirm before serving.",
+    content:
+      "For allergy questions, the AI should summarize known allergens and ask staff to confirm before serving.",
     category: "allergy_policy",
     isActive: true,
   });
 
+  const table2 = await prisma.restaurantTable.findFirst({
+    where: { tableNumber: "2" },
+  });
+
+  if (table2) {
+    const session = await prisma.customerSession.upsert({
+      where: { sessionToken: "test-session-table-2" },
+      update: {},
+      create: {
+        restaurantId: restaurant.id,
+        tableId: table2.id,
+        sessionToken: "test-session-table-2",
+        status: "active",
+        startedAt: new Date(),
+      },
+    });
+
+    const existingRequest = await prisma.customerRequest.findFirst({
+      where: { sessionId: session.id },
+    });
+    if (!existingRequest) {
+      const newRequest = await prisma.customerRequest.create({
+        data: {
+          sessionId: session.id,
+          requestType: "Request bill",
+          status: "Waiting",
+          description: "Customer wants to pay",
+          createdAt: new Date(),
+        },
+      });
+      console.log(`CustomerRequest! ID is: ${newRequest.id}`);
+    }
+  }
+
   console.log("Seed data created for TestPizza.");
+
+  // NEW: Create a real test order for the Staff Dashboard
+  // Orders must belong to a session, so fetch the first existing customer session
+  const existingSession = await prisma.customerSession.findFirst();
+
+  if (existingSession) {
+    // Create a real order with initial status "Preparing"
+    const newOrder = await prisma.order.create({
+      data: {
+        sessionId: existingSession.id,
+        status: "Preparing",
+        total: 26.5,
+
+        orderItems: {
+          create: [
+            { name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
+            { name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
+          ],
+        },
+      },
+    });
+    console.log(
+      `Order seed data created successfully! Order ID: ${newOrder.id}`
+    );
+  } else {
+    console.log(
+      "Notice: No CustomerSession found in the database. Cannot create order. Please ensure session data is seeded first!"
+    );
+  }
 }
 
 main()

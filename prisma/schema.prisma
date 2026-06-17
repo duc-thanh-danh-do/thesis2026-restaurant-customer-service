@@ -46,6 +46,7 @@ model CustomerSession {
   restaurant       Restaurant         @relation(fields: [restaurantId], references: [id])
   table            RestaurantTable    @relation(fields: [tableId], references: [id])
   chatMessages     ChatMessage[]
+  orders           Order[]
   customerRequests CustomerRequest[]
   aiResponseLogs   AiResponseLog[]
 
@@ -171,4 +172,27 @@ model AuditLog {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
+}
+
+model Order {
+  id           Int             @id @default(autoincrement())
+  sessionId    Int             @map("session_id")
+  status       String          @db.VarChar(50) 
+  total        Decimal         @db.Decimal(10, 2)
+  createdAt    DateTime?       @default(now()) @map("created_at")
+  session      CustomerSession @relation(fields: [sessionId], references: [id])
+  orderItems   OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int     @map("order_id")
+  name      String  @db.VarChar(255)
+  price     Decimal @db.Decimal(10, 2)
+  quantity  Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
 }

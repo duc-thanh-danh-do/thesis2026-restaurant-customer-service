@@ -1,9 +1,5 @@
-import MenuItemTable from "@/components/menu/MenuItemTable";
+import { redirect } from "next/navigation";
 
 export default function StaffMenuPage() {
-  return (
-    <main className="p-6">
-      <MenuItemTable />
-    </main>
-  );
+  redirect("/menu/admin");
 }

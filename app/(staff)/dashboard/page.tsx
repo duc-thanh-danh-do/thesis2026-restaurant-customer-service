@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import RequestCard from "@/components/staff/RequestCard";
+import OrderCard from "@/components/staff/OrderCard";
+import { getTestOrder } from "@/actions/customer-order.action";
+import { getTableRequestsAction } from "@/actions/customer-request.action";
 import {
   AlertTriangle,
   ChevronRight,
@@ -103,8 +107,8 @@ const mockOrder = {
   total: 26.5,
   status: "Preparing" as const,
   items: [
-    { name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
-    { name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
+    { id: 1, name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
+    { id: 2, name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
   ],
 };
 
@@ -140,11 +144,7 @@ function TableList({
           }}
           className={`
             cursor-pointer rounded-lg p-4 transition-all duration-200
-            ${
-              selectedId === table.id
-                ? "bg-white/10"
-                : "hover:bg-white/5"
-            }
+            ${selectedId === table.id ? "bg-white/10" : "hover:bg-white/5"}
           `}
         >
           <div className="flex items-start justify-between">
@@ -190,11 +190,7 @@ function EmptyState() {
   );
 }
 
-function ChatPanel({
-  tableId,
-}: {
-  tableId: string | null;
-}) {
+function ChatPanel({ tableId }: { tableId: string | null }) {
   const [message, setMessage] = useState("");
 
   if (!tableId) {
@@ -250,9 +246,7 @@ function ChatPanel({
                 <p className="text-sm">{msg.text}</p>
                 <p
                   className={`text-xs mt-1 ${
-                    msg.sender === "user"
-                      ? "text-slate-400"
-                      : "text-slate-400"
+                    msg.sender === "user" ? "text-slate-400" : "text-slate-400"
                   }`}
                 >
                   {msg.time}
@@ -284,143 +278,24 @@ function ChatPanel({
   );
 }
 
-function OrderCard({ order }: { order: typeof mockOrder }) {
-  const activeStep = 1; // Preparing
+function DetailsPanel({ tableId }: { tableId: string | null }) {
+  const [realOrder, setRealOrder] = useState<typeof mockOrder | null>(null);
+  const [realRequests, setRealRequests] = useState<any[]>([]);
 
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-        <div className="flex items-center justify-between">
-          <span className="font-medium text-slate-700">
-            {order.id} · {order.time}
-          </span>
-          <span className="font-semibold text-slate-800">
-            €{order.total.toFixed(2)}
-          </span>
-        </div>
-      </div>
+  useEffect(() => {
+    if (!tableId) return;
 
-      {/* Progress */}
-      <div className="px-4 py-4 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-medium text-slate-400 uppercase">
-            Progress
-          </span>
-          <span className="text-sm font-medium text-slate-700">
-            {order.status}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          {stepStatuses.map((step, i) => (
-            <div key={step} className="flex-1 flex items-center">
-              <div
-                className={`
-                  w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium
-                  ${
-                    i < activeStep
-                      ? "bg-blue-500 text-white"
-                      : i === activeStep
-                      ? "bg-blue-500 text-white"
-                      : "bg-slate-100 text-slate-400"
-                  }
-                `}
-              >
-                {i < activeStep ? (
-                  <Check className="h-3 w-3" />
-                ) : (
-                  <span>{i + 1}</span>
-                )}
-              </div>
-              {i < stepStatuses.length - 1 && (
-                <div
-                  className={`flex-1 h-0.5 ${
-                    i < activeStep ? "bg-blue-500" : "bg-slate-100"
-                  }`}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between mt-1">
-          {stepStatuses.map((step) => (
-            <span
-              key={step}
-              className="text-[10px] text-slate-400 uppercase"
-            >
-              {step}
-            </span>
-          ))}
-        </div>
-      </div>
+    // get orders
+    getTestOrder().then((data) => {
+      if (data) {
+        setRealOrder(data as any);
+      }
+    });
 
-      {/* Items */}
-      <div className="p-4">
-        <div className="space-y-3">
-          {order.items.map((item, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6 rounded-full border-slate-300"
-                  >
-                    <span className="text-xs">-</span>
-                  </Button>
-                  <span className="w-6 text-center text-sm">{item.quantity}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6 rounded-full border-slate-300"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </div>
-                <span className="text-sm text-slate-700">{item.name}</span>
-              </div>
-              <span className="text-sm font-medium text-slate-700">
-                €{item.price.toFixed(2)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RequestCard({ request }: { request: typeof mockRequests[0] }) {
-  const activeBadge = request.status;
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-slate-700">{request.text}</span>
-        <span className="text-xs text-slate-400">{request.time}</span>
-      </div>
-      <div className="flex gap-1.5">
-        {request.badges.map((badge) => (
-          <span
-            key={badge}
-            className={`text-xs px-2 py-0.5 rounded-full ${
-              badge === activeBadge
-                ? "bg-slate-700 text-white"
-                : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {badge}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DetailsPanel({
-  tableId,
-}: {
-  tableId: string | null;
-}) {
+    getTableRequestsAction(tableId).then((data) => {
+      setRealRequests(data);
+    });
+  }, [tableId]);
   if (!tableId) {
     return (
       <div className="flex min-h-[320px] h-full items-center justify-center rounded-xl bg-slate-50">
@@ -432,18 +307,58 @@ function DetailsPanel({
   return (
     <div className="h-full overflow-auto rounded-xl bg-slate-50 p-4">
       <div className="space-y-4">
+        {/* Orders */}
         <div>
           <h3 className="text-xs font-medium text-slate-400 uppercase mb-3">
             Orders
           </h3>
-          <OrderCard order={mockOrder} />
+          {realOrder ? (
+            <OrderCard
+              id={realOrder.id}
+              time={realOrder.time}
+              total={realOrder.total}
+              initialStatus={realOrder.status}
+              items={realOrder.items}
+            />
+          ) : (
+            <div className="text-sm text-slate-400 p-4 border border-dashed border-slate-200 rounded-lg text-center">
+              Loading order data...
+            </div>
+          )}
         </div>
 
+        {/* Service requests  */}
         <div>
           <h3 className="text-xs font-medium text-slate-400 uppercase mb-3">
             Service requests
           </h3>
-          <RequestCard request={mockRequests[0]} />
+          <div className="space-y-3">
+            {realRequests.length === 0 ? (
+              <div className="text-sm text-slate-400 p-4 border border-dashed border-slate-200 rounded-lg text-center">
+                No active requests for Table {tableId}
+              </div>
+            ) : (
+              realRequests.map((req) => {
+                const reqType = req.requestType.replace("_", " ");
+                const timeStr = req.createdAt
+                  ? new Date(req.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "Just now";
+
+                return (
+                  <RequestCard
+                    key={req.id}
+                    id={req.id}
+                    text={reqType}
+                    time={timeStr}
+                    initialStatus={req.status}
+                  />
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     </div>
