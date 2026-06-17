@@ -3,6 +3,13 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+type OrderItemRow = {
+  id: number;
+  name: string;
+  price: number | string | { toString(): string };
+  quantity: number;
+};
+
 export async function updateOrderStatus(orderId: number, status: string) {
   try {
     // update order status
@@ -33,7 +40,7 @@ export async function getTestOrder() {
       time: "Just now",
       total: Number(order.total),
       status: order.status,
-      items: order.orderItems.map((item) => ({
+      items: order.orderItems.map((item: OrderItemRow) => ({
         id: item.id,
         name: item.name,
         price: Number(item.price),
@@ -61,9 +68,9 @@ export async function updateItemQuantityAction(
       });
     }
 
-    const updatedItems = await prisma.orderItem.findMany({
+    const updatedItems = (await prisma.orderItem.findMany({
       where: { orderId },
-    });
+    })) as OrderItemRow[];
     const newTotal = updatedItems.reduce(
       (sum, item) => sum + Number(item.price) * item.quantity,
       0
