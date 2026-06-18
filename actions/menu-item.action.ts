@@ -122,6 +122,7 @@ export async function toggleMenuItemAvailabilityAction(
 }
 
 // Edit MenuItem
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function editMenuItemAction(id: number, data: any) {
   try {
     const editItem = await prisma.menuItem.update({

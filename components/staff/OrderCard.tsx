@@ -20,7 +20,6 @@ interface OrderItem {
 interface OrderCardProps {
   id: string;
   time: string;
-  total: number;
   initialStatus: string;
   items: OrderItem[];
 }
@@ -28,7 +27,6 @@ interface OrderCardProps {
 export default function OrderCard({
   id,
   time,
-  total,
   initialStatus,
   items,
 }: OrderCardProps) {

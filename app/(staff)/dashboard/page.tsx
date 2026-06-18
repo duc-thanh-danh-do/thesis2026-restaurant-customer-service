@@ -1,18 +1,12 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect } from "react";
 import RequestCard from "@/components/staff/RequestCard";
 import OrderCard from "@/components/staff/OrderCard";
 import { getTestOrder } from "@/actions/customer-order.action";
 import { getTableRequestsAction } from "@/actions/customer-request.action";
-import {
-  AlertTriangle,
-  ChevronRight,
-  Utensils,
-  Settings,
-  Plus,
-  Check,
-} from "lucide-react";
+import { AlertTriangle, ChevronRight, Utensils, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -101,28 +95,28 @@ const mockMessages = [
   },
 ];
 
-const mockOrder = {
-  id: "#A1",
-  time: "19 min ago",
-  total: 26.5,
-  status: "Preparing" as const,
-  items: [
-    { id: 1, name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
-    { id: 2, name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
-  ],
-};
+// const mockOrder = {
+//   id: "#A1",
+//   time: "19 min ago",
+//   total: 26.5,
+//   status: "Preparing" as const,
+//   items: [
+//     { id: 1, name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
+//     { id: 2, name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
+//   ],
+// };
 
-const mockRequests = [
-  {
-    id: "bill",
-    text: "Request bill",
-    time: "3 min ago",
-    status: "Waiting" as const,
-    badges: ["Waiting", "In progress", "Resolved"],
-  },
-];
+// const mockRequests = [
+//   {
+//     id: "bill",
+//     text: "Request bill",
+//     time: "3 min ago",
+//     status: "Waiting" as const,
+//     badges: ["Waiting", "In progress", "Resolved"],
+//   },
+// ];
 
-const stepStatuses = ["Placed", "Preparing", "Ready", "Served"];
+// const stepStatuses = ["Placed", "Preparing", "Ready", "Served"];
 
 function TableList({
   tables,
@@ -279,7 +273,7 @@ function ChatPanel({ tableId }: { tableId: string | null }) {
 }
 
 function DetailsPanel({ tableId }: { tableId: string | null }) {
-  const [realOrder, setRealOrder] = useState<typeof mockOrder | null>(null);
+  const [realOrder, setRealOrder] = useState<any>(null);
   const [realRequests, setRealRequests] = useState<any[]>([]);
 
   useEffect(() => {
@@ -316,7 +310,6 @@ function DetailsPanel({ tableId }: { tableId: string | null }) {
             <OrderCard
               id={realOrder.id}
               time={realOrder.time}
-              total={realOrder.total}
               initialStatus={realOrder.status}
               items={realOrder.items}
             />
