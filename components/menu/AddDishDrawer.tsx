@@ -100,9 +100,10 @@ export default function AddDishDrawer({
         category,
         price: parseFloat(price) || 0,
         description,
+        dietary: selectedDietary.join(", "),
         ingredients: selectedIngredients.join(", "),
-        isVegetarian: selectedDietary.includes("VEGETARIAN"),
-        isVegan: selectedDietary.includes("VEGAN"),
+      //   isVegetarian: selectedDietary.includes("VEGETARIAN"),
+      //   isVegan: selectedDietary.includes("VEGAN"),
       };
 
       let result;
