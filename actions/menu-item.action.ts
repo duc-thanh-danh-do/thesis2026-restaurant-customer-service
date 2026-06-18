@@ -8,6 +8,7 @@ interface CreateMenuItemInput {
   category: string;
   price: number;
   description: string;
+  dietary?: string;
   ingredients: string;
   isVegetarian: boolean;
   isVegan: boolean;
@@ -45,6 +46,7 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
         price: data.price,
         description: data.description,
         ingredients: data.ingredients,
+        dietary: data.dietary,
         isVegetarian: data.isVegetarian,
         isVegan: data.isVegan,
         isAvailable: true,
@@ -132,6 +134,7 @@ export async function editMenuItemAction(id: number, data: any) {
         description: data.description,
         price: data.price,
         category: data.category,
+        dietary: data.dietary,
         isVegetarian: data.isVegetarian,
         isVegan: data.isVegan,
         ingredients: data.ingredients,
@@ -139,7 +142,10 @@ export async function editMenuItemAction(id: number, data: any) {
     });
 
     revalidatePath("/menu/admin");
-    return { success: true, data: editItem };
+    return { success: true, data: {
+      ...editItem,
+      price: Number(editItem.price)
+    } };
   } catch (error) {
     console.error("Failed to update dish:", error);
     return { success: false, error: "Failed to update dish" };
