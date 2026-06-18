@@ -154,9 +154,31 @@ export const fallbackKnowledgeBase = [
 ];
 
 export function isDatabaseUnavailable(error: unknown) {
-  if (!(error instanceof Error)) return false;
+  const message = collectErrorMessages(error);
 
-  return /connection|connect|closed|ECONNREFUSED|P1000|P1001|Can't reach database|Authentication failed|database credentials/i.test(
-    error.message,
+  return /connection|connect|closed|ECONNREFUSED|ENOTFOUND|P1000|P1001|Can't reach database|Authentication failed|database credentials|tenant\/user/i.test(
+    message,
   );
+}
+
+function collectErrorMessages(error: unknown, seen = new WeakSet<object>()): string {
+  if (!error || (typeof error !== "object" && typeof error !== "string")) {
+    return "";
+  }
+
+  if (typeof error === "string") return error;
+  if (seen.has(error)) return "";
+  seen.add(error);
+
+  const source = error as {
+    message?: unknown;
+    originalMessage?: unknown;
+    cause?: unknown;
+  };
+
+  return [
+    typeof source.message === "string" ? source.message : "",
+    typeof source.originalMessage === "string" ? source.originalMessage : "",
+    collectErrorMessages(source.cause, seen),
+  ].join(" ");
 }

@@ -11,6 +11,7 @@
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
+    "test": "tsx --test tests/**/*.test.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "prisma:validate": "prisma validate",
