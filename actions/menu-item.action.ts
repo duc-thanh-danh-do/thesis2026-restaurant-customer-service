@@ -8,10 +8,10 @@ interface CreateMenuItemInput {
   category: string;
   price: number;
   description: string;
+  dietary?: string;
   ingredients: string;
   // isVegetarian: boolean;
   // isVegan: boolean;
-  dietary?: string;
 }
 
 type DecimalLike = number | string | { toString(): string };

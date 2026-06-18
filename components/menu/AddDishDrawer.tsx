@@ -19,8 +19,7 @@ interface MenuItem {
   category: string | null;
   price: number;
   isAvailable: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
+  dietary?: string | null;
   description?: string | null;
   imageUrl?: string | null;
   ingredients?: string | null;
@@ -50,10 +49,15 @@ export default function AddDishDrawer({
         setPrice(initialData.price.toString());
         setDescription(initialData.description || "");
 
-        const dietTags: string[] = [];
-        if (initialData.isVegan) dietTags.push("VEGAN");
-        if (initialData.isVegetarian) dietTags.push("VEGETARIAN");
-        setSelectedDietary(dietTags);
+        if (initialData.dietary) {
+          const dietArray = initialData.dietary
+            .split(",")
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0);
+          setSelectedDietary(dietArray);
+        } else {
+          setSelectedDietary([]);
+        }
 
         if (initialData.ingredients) {
           const ingArray = initialData.ingredients
