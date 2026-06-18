@@ -1,22 +1,22 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { INGREDIENTS } from '@/data/mock-data';
-import MenuAdminHeader from '@/components/menu/MenuManagementHeader';
+import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { INGREDIENTS } from "@/data/mock-data";
+import MenuAdminHeader from "@/components/menu/MenuManagementHeader";
 
 export default function IngredientsPage() {
-  const [newIngredient, setNewIngredient] = useState('');
+  const [newIngredient, setNewIngredient] = useState("");
   const [ingredients, setIngredients] = useState(INGREDIENTS);
 
   const addIngredient = () => {
     if (newIngredient.trim()) {
       setIngredients([...ingredients, newIngredient.trim()]);
-      setNewIngredient('');
+      setNewIngredient("");
     }
   };
 
@@ -32,7 +32,6 @@ export default function IngredientsPage() {
       {/* Ingredients */}
       <div className="flex-1 overflow-y-auto px-6 py-6 w-full">
         <div className="max-w-[620px] mx-auto space-y-6">
-          
           {/* Add Ingredient Card */}
           <Card className="p-4 bg-white border border-[#d5e1ec] rounded-[20px]">
             <div className="space-y-3">
@@ -46,7 +45,7 @@ export default function IngredientsPage() {
                   onChange={(e) => setNewIngredient(e.target.value)}
                   className="flex-1 border-[#d5e1ec] rounded-lg"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       addIngredient();
                     }
                   }}
@@ -69,10 +68,15 @@ export default function IngredientsPage() {
               CATALOG ({ingredients.length})
             </div>
             <div className="space-y-2">
-              {ingredients.map((ingredient, index) => (
-                <Card key={index} className="p-3 bg-white border border-[#d5e1ec] rounded-lg shadow-sm">
+            {[...ingredients].sort((a, b) => a.localeCompare(b)).map((ingredient) => (
+                <Card
+                  key={ingredient}
+                  className="p-3 bg-white border border-[#d5e1ec] rounded-lg shadow-sm"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-[#142653] capitalize font-medium">{ingredient}</span>
+                    <span className="text-[#142653] capitalize font-medium">
+                      {ingredient}
+                    </span>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -86,7 +90,6 @@ export default function IngredientsPage() {
               ))}
             </div>
           </div>
-
         </div>
       </div>
     </div>
