@@ -46,6 +46,9 @@ export default function MenuAdminPage() {
   };
 
   useEffect(() => {
+    const fetchItems = async () => {
+      const data = await getMenuItemsAction();
+    };
     fetchItems();
   }, []);
 
