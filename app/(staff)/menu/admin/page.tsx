@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useEffect,
-  JSXElementConstructor,
-  Key,
-  ReactElement,
-  ReactNode,
-  ReactPortal,
-} from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -43,6 +35,8 @@ export default function MenuAdminPage() {
     id: 0,
     name: "",
   });
+
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   const fetchItems = async () => {
     setIsLoading(true);
@@ -119,7 +113,10 @@ export default function MenuAdminPage() {
               DISHES {isLoading ? "(Loading...)" : `(${menuItems.length})`}
             </div>
             <Button
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={() => {
+                setEditingItem(null);
+                setIsDrawerOpen(true);
+              }}
               className="bg-[#142653] hover:bg-[#13275a] text-white rounded-full px-4 py-2"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -129,12 +126,6 @@ export default function MenuAdminPage() {
 
           {/* Dish List */}
           <div className="space-y-6">
-            {!isLoading && menuItems.length === 0 && (
-              <p className="text-slate-500 text-sm text-center py-10">
-                No dishes found. Click "Add dish" to create one!
-              </p>
-            )}
-
             {categoryOrder.map((category) => {
               const items = menuItemsByCategory[category] || [];
               if (items.length === 0) return null;
@@ -179,6 +170,10 @@ export default function MenuAdminPage() {
                               variant="outline"
                               size="sm"
                               className="rounded-full px-3 py-1 text-sm h-8"
+                              onClick={() => {
+                                setEditingItem(item);
+                                setIsDrawerOpen(true);
+                              }}
                             >
                               <Pencil className="h-3 w-3 sm:mr-1" />
                               <span className="hidden sm:inline">Edit</span>
@@ -222,7 +217,11 @@ export default function MenuAdminPage() {
         </div>
       </div>
 
-      <AddDishDrawer isOpen={isDrawerOpen} onClose={handleCloseDrawer} />
+      <AddDishDrawer
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        initialData={editingItem}
+      />
 
       <DeleteConfirmModal
         isOpen={deleteModal.isOpen}
@@ -257,8 +256,8 @@ function DeleteConfirmModal({
 
         <p className="text-sm text-slate-600 mb-6 leading-relaxed">
           Are you sure you want to delete{" "}
-          <span className="font-bold text-slate-800">"{name}"</span>? This
-          action cannot be undone.
+          <span className="font-bold text-slate-800">&quot;{name}&quot;</span>?
+          This action cannot be undone.
         </p>
 
         <div className="flex justify-end gap-3">

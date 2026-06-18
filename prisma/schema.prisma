@@ -101,10 +101,9 @@ model MenuItem {
   category          String?             @db.VarChar(100)
   price             Decimal             @db.Decimal(10, 2)
   ingredients       String?             @db.Text
+  dietary           String?             @db.Text
   imageUrl          String?             @map("image_url") @db.VarChar(500)
   isAvailable       Boolean             @default(true) @map("is_available")
-  isVegetarian      Boolean             @default(false) @map("is_vegetarian")
-  isVegan           Boolean             @default(false) @map("is_vegan")
   createdAt         DateTime?           @map("created_at")
   updatedAt         DateTime?           @map("updated_at")
   restaurant        Restaurant          @relation(fields: [restaurantId], references: [id])

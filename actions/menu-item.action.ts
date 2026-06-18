@@ -8,6 +8,7 @@ interface CreateMenuItemInput {
   category: string;
   price: number;
   description: string;
+  dietary?: string;
   ingredients: string;
   isVegetarian: boolean;
   isVegan: boolean;
@@ -45,6 +46,7 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
         price: data.price,
         description: data.description,
         ingredients: data.ingredients,
+        dietary: data.dietary,
         isVegetarian: data.isVegetarian,
         isVegan: data.isVegan,
         isAvailable: true,
@@ -97,7 +99,7 @@ export async function deleteMenuItemAction(id: number) {
     revalidatePath("/menu/admin");
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete menu:", error);
+    console.error("Failed to delete dish:", error);
     return { success: false, error: "Failed to delete dish" };
   }
 }
@@ -118,5 +120,34 @@ export async function toggleMenuItemAvailabilityAction(
   } catch (error) {
     console.error("Failed to change the availability:", error);
     return { success: false, error: "Failed to toggle availability" };
+  }
+}
+
+// Edit MenuItem
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function editMenuItemAction(id: number, data: any) {
+  try {
+    const editItem = await prisma.menuItem.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        category: data.category,
+        dietary: data.dietary,
+        isVegetarian: data.isVegetarian,
+        isVegan: data.isVegan,
+        ingredients: data.ingredients,
+      },
+    });
+
+    revalidatePath("/menu/admin");
+    return { success: true, data: {
+      ...editItem,
+      price: Number(editItem.price)
+    } };
+  } catch (error) {
+    console.error("Failed to update dish:", error);
+    return { success: false, error: "Failed to update dish" };
   }
 }

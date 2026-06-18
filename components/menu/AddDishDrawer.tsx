@@ -1,16 +1,37 @@
 "use client";
+/* eslint-disable */
 
-import React, { useState, useTransition } from "react";
-import { createMenuItemAction } from "@/actions/menu-item.action";
+import React, { useState, useTransition, useEffect } from "react";
+import {
+  createMenuItemAction,
+  editMenuItemAction,
+} from "@/actions/menu-item.action";
 
 interface AddDishDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  initialData?: MenuItem | null;
 }
 
-export default function AddDishDrawer({ isOpen, onClose }: AddDishDrawerProps) {
+interface MenuItem {
+  id: number;
+  name: string;
+  category: string | null;
+  price: number;
+  isAvailable: boolean;
+  dietary?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  ingredients?: string | null;
+}
+
+export default function AddDishDrawer({
+  isOpen,
+  onClose,
+  initialData,
+}: AddDishDrawerProps) {
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("STARTERS"); // 默认选 Starters
+  const [category, setCategory] = useState("STARTERS");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
 
@@ -18,6 +39,46 @@ export default function AddDishDrawer({ isOpen, onClose }: AddDishDrawerProps) {
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
 
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        // Edit Menu Mode
+        setName(initialData.name);
+        setCategory(initialData.category || "STARTERS");
+        setPrice(initialData.price.toString());
+        setDescription(initialData.description || "");
+
+        if (initialData.dietary) {
+          const dietArray = initialData.dietary
+            .split(",")
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0);
+          setSelectedDietary(dietArray);
+        } else {
+          setSelectedDietary([]);
+        }
+
+        if (initialData.ingredients) {
+          const ingArray = initialData.ingredients
+            .split(",")
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0);
+          setSelectedIngredients(ingArray);
+        } else {
+          setSelectedIngredients([]);
+        }
+      } else {
+        // Add Menu Mode
+        setName("");
+        setCategory("STARTERS");
+        setPrice("");
+        setDescription("");
+        setSelectedDietary([]);
+        setSelectedIngredients([]);
+      }
+    }
+  }, [isOpen, initialData]);
 
   const toggleDietary = (tag: string) => {
     setSelectedDietary((prev) =>
@@ -38,23 +99,25 @@ export default function AddDishDrawer({ isOpen, onClose }: AddDishDrawerProps) {
     }
 
     startTransition(async () => {
-      const result = await createMenuItemAction({
+      const payload = {
         name,
         category,
         price: parseFloat(price) || 0,
         description,
         ingredients: selectedIngredients.join(", "),
+        dietary: selectedDietary.join(", "),
         isVegetarian: selectedDietary.includes("VEGETARIAN"),
         isVegan: selectedDietary.includes("VEGAN"),
-      });
+      };
+
+      let result;
+      if (initialData) {
+        result = await editMenuItemAction(initialData.id, payload);
+      } else {
+        result = await createMenuItemAction(payload);
+      }
 
       if (result.success) {
-        setName("");
-        setCategory("STARTERS");
-        setPrice("");
-        setDescription("");
-        setSelectedDietary([]);
-        setSelectedIngredients([]);
         onClose();
       } else {
         alert("Failed to save dish: " + result.error);
@@ -108,6 +171,9 @@ export default function AddDishDrawer({ isOpen, onClose }: AddDishDrawerProps) {
     "mineral water",
   ];
 
+  const titleText = initialData ? "Edit dish" : "Add dish";
+  const buttonText = initialData ? "Save changes" : "Add dish";
+
   return (
     <>
       <div
@@ -124,9 +190,9 @@ export default function AddDishDrawer({ isOpen, onClose }: AddDishDrawerProps) {
         }`}
       >
         <div className="flex items-center justify-between px-6 py-4 shrink-0">
-          <h3 className="text-xl font-bold text-slate-800">Add dish</h3>
+          <h3 className="text-xl font-bold text-slate-800">{titleText}</h3>
           <button
-            title="add dish"
+            title="close"
             type="button"
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
@@ -306,14 +372,13 @@ export default function AddDishDrawer({ isOpen, onClose }: AddDishDrawerProps) {
           >
             Cancel
           </button>
-
           <button
             type="button"
             onClick={handleSubmit}
             disabled={isPending}
             className="px-6 py-2.5 text-sm font-semibold text-white bg-[#142653] hover:bg-[#13275a] rounded-lg shadow-sm transition disabled:opacity-50 flex items-center gap-2"
           >
-            {isPending ? "Saving..." : "Add dish"}
+            {isPending ? "Saving..." : buttonText}
           </button>
         </div>
       </div>
