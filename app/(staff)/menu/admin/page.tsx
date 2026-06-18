@@ -18,8 +18,9 @@ interface MenuItem {
   category: string | null;
   price: number;
   isAvailable: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
+  dietary?: string | null;
+  // isVegetarian: boolean;
+  // isVegan: boolean;
   description?: string | null;
   imageUrl?: string | null;
 }
@@ -162,8 +163,9 @@ export default function MenuAdminPage() {
                               </div>
                               <div className="text-sm text-gray-600 truncate">
                                 €{item.price.toFixed(2)}
-                                {item.isVegetarian && " · vegetarian"}
-                                {item.isVegan && " · vegan"}
+                                {/* {item.isVegetarian && " · vegetarian"}
+                                {item.isVegan && " · vegan"} */}
+                                {item.dietary && ` · ${item.dietary.toLowerCase()}`}
                               </div>
                             </div>
                           </div>

@@ -24,10 +24,11 @@ type MenuItemRow = {
   category: string | null;
   price: DecimalLike;
   ingredients: string | null;
+  dietary: string | null
   imageUrl: string | null;
   isAvailable: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
+  // isVegetarian: boolean;
+  // isVegan: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
 };

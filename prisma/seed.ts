@@ -23,8 +23,9 @@ type MenuItemSeed = {
   price: string;
   ingredients: string;
   isAvailable: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
+  // isVegetarian: boolean;
+  // isVegan: boolean;
+  dietary?: string | null;
   allergens: string[];
 };
 
@@ -59,8 +60,9 @@ async function upsertMenuItem(restaurantId: number, item: MenuItemSeed) {
     price: new Prisma.Decimal(item.price),
     ingredients: item.ingredients,
     isAvailable: item.isAvailable,
-    isVegetarian: item.isVegetarian,
-    isVegan: item.isVegan,
+    // isVegetarian: item.isVegetarian,
+    // isVegan: item.isVegan,
+    dietary: item.dietary,
   };
 
   const existing = await prisma.menuItem.findFirst({
@@ -154,8 +156,9 @@ async function main() {
       price: "11.90",
       ingredients: "Pizza dough, tomato sauce, mozzarella, basil, olive oil",
       isAvailable: true,
-      isVegetarian: true,
-      isVegan: false,
+      // isVegetarian: true,
+      // isVegan: false,
+      dietary: "VEGETARIAN",
       allergens: ["Gluten", "Milk"],
     },
     {
@@ -165,8 +168,9 @@ async function main() {
       price: "13.90",
       ingredients: "Pizza dough, tomato sauce, mozzarella, pepperoni, oregano",
       isAvailable: true,
-      isVegetarian: false,
-      isVegan: false,
+      // isVegetarian: false,
+      // isVegan: false,
+      dietary: null,
       allergens: ["Gluten", "Milk"],
     },
     {
@@ -178,8 +182,9 @@ async function main() {
       ingredients:
         "Pizza dough, tomato sauce, vegan cheese, bell pepper, mushroom, red onion, olives",
       isAvailable: true,
-      isVegetarian: true,
-      isVegan: true,
+      // isVegetarian: true,
+      // isVegan: true,
+      dietary: "VEGAN",
       allergens: ["Gluten", "Soy"],
     },
     {
@@ -190,8 +195,9 @@ async function main() {
       ingredients:
         "Pizza dough, tomato sauce, mozzarella, tuna, red onion, capers",
       isAvailable: true,
-      isVegetarian: false,
-      isVegan: false,
+      // isVegetarian: false,
+      // isVegan: false,
+      dietary: null,
       allergens: ["Gluten", "Milk", "Fish"],
     },
     {
@@ -203,8 +209,9 @@ async function main() {
       ingredients:
         "Bread, garlic butter, egg wash, parsley, sesame seed topping",
       isAvailable: true,
-      isVegetarian: true,
-      isVegan: false,
+      // isVegetarian: true,
+      // isVegan: false,
+      dietary: "VEGETARIAN",
       allergens: ["Gluten", "Milk", "Egg", "Sesame"],
     },
   ];

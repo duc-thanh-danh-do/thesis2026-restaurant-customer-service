@@ -23,8 +23,9 @@ export async function getMenuItems(
         ingredients: item.ingredients,
         imageUrl: item.imageUrl,
         isAvailable: item.isAvailable,
-        isVegetarian: item.isVegetarian,
-        isVegan: item.isVegan,
+        // isVegetarian: item.isVegetarian,
+        // isVegan: item.isVegan,
+        dietary: item.dietary,
         allergens: item.menuItemAllergens.map(({ allergen }) => ({
           id: allergen.id,
           name: allergen.name,
@@ -48,10 +49,11 @@ export async function getMenuItems(
         ) {
           return false;
         }
-        if (
-          filters.isVegetarian !== undefined &&
-          item.isVegetarian !== filters.isVegetarian
-        ) {
+        if (filters.dietary) {
+          if (!item.dietary || !item.dietary.includes(filters.dietary)) {
+            return false;
+          }
+        } {
           return false;
         }
         return true;

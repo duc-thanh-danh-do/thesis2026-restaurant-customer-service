@@ -6,10 +6,11 @@ export type MenuItemDto = {
   category: string | null;
   price: number;
   ingredients: string | null;
+  dietary: string | null;
   imageUrl: string | null;
   isAvailable: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
+  // isVegetarian: boolean;
+  // isVegan: boolean;
   allergens: Array<{
     id: number;
     name: string;
