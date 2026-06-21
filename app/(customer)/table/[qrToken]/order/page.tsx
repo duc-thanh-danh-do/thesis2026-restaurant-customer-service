@@ -1,28 +1,26 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
 import { CustomerBottomNav, CustomerMobileHeader, CustomerMobileLayout } from '@/components/layout/CustomerMobileLayout';
-import { MENU_ITEMS, MOCK_ORDERS } from '@/data/mock-data';
 
 const cartStorageKey = 'bistro-demo-cart';
 const orderStorageKey = 'bistro-demo-order';
 
-function getFallbackOrder() {
-  if (typeof window !== 'undefined') {
-    const savedOrder = window.localStorage.getItem(orderStorageKey);
-    if (savedOrder) {
-      return JSON.parse(savedOrder) as Record<string, number>;
-    }
-  }
-
-  return MOCK_ORDERS[4].items.reduce<Record<string, number>>((order, item) => {
-    order[item.menuItem.id] = item.quantity;
-    return order;
-  }, {});
-}
+type CustomerOrder = {
+  id: number;
+  status: string;
+  total: number;
+  createdAt: string | null;
+  items: Array<{
+    id: number;
+    name: string;
+    price: number;
+    quantity: number;
+  }>;
+};
 
 function getInitialCartCount() {
   if (typeof window === 'undefined') return 0;
@@ -34,25 +32,54 @@ function getInitialCartCount() {
   return Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
 }
 
+function getSavedOrderId() {
+  if (typeof window === 'undefined') return null;
+
+  const savedOrderId = window.localStorage.getItem(orderStorageKey);
+  if (!savedOrderId || !/^\d+$/.test(savedOrderId)) return null;
+
+  return savedOrderId;
+}
+
+function formatOrderStatus(status: string) {
+  return status
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export default function OrderPage() {
   const params = useParams<{ qrToken: string }>();
   const router = useRouter();
   const basePath = `/table/${params.qrToken}`;
-  const [order] = useState<Record<string, number>>(getFallbackOrder);
+  const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [cartCount] = useState(getInitialCartCount);
+
+  useEffect(() => {
+    const orderId = getSavedOrderId();
+    if (!orderId) return;
+
+    async function loadOrder() {
+      const response = await fetch(`/api/customer-orders/${orderId}`);
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as { order: CustomerOrder };
+      setOrder(payload.order);
+    }
+
+    loadOrder();
+  }, []);
 
   const orderItems = useMemo(
     () =>
-      Object.entries(order)
-        .map(([itemId, quantity]) => ({
-          item: MENU_ITEMS.find((menuItem) => menuItem.id === itemId),
-          quantity,
-        }))
-        .filter((entry): entry is { item: (typeof MENU_ITEMS)[number]; quantity: number } => Boolean(entry.item) && entry.quantity > 0),
+      (order?.items ?? []).map((item) => ({
+        item,
+        quantity: item.quantity,
+      })),
     [order],
   );
 
-  const total = orderItems.reduce((sum, entry) => sum + entry.item.price * entry.quantity, 0);
+  const total = order?.total ?? orderItems.reduce((sum, entry) => sum + entry.item.price * entry.quantity, 0);
 
   return (
     <CustomerMobileLayout>
@@ -74,7 +101,7 @@ export default function OrderPage() {
           <div className="mb-4 rounded-[20px] border border-[#d5e1ec] bg-white p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <span className="text-xs font-bold text-[#142653]">ORDER #A1</span>
+                <span className="text-xs font-bold text-[#142653]">ORDER #{order?.id ?? 'A1'}</span>
                 <p className="mt-0.5 text-xs text-gray-500">Placed 18 min ago - updated 7 min ago</p>
               </div>
               <span className="shrink-0 text-lg font-bold text-[#142653]">EUR {total.toFixed(2)}</span>
@@ -82,7 +109,7 @@ export default function OrderPage() {
 
             <div className="mb-4">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">PROGRESS</span>
-              <p className="mt-1 text-sm font-medium text-[#438ed8]">Preparing</p>
+              <p className="mt-1 text-sm font-medium text-[#438ed8]">{formatOrderStatus(order?.status ?? 'preparing')}</p>
 
               <div className="mt-3 flex items-center gap-2">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#438ed8]">
