@@ -14,6 +14,7 @@ type CustomerOrder = {
   status: string;
   total: number;
   createdAt: string | null;
+  tableNumber: string;
   items: Array<{
     id: number;
     name: string;
@@ -84,7 +85,7 @@ export default function OrderPage() {
   return (
     <CustomerMobileLayout>
       <CustomerMobileHeader
-        title="Your order - Table 4"
+        title={`Your order - Table ${order?.tableNumber ?? ''}`.trim()}
         subtitle="Status updates automatically - no refresh needed."
         rightElement={
           <button

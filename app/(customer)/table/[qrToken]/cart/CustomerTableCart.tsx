@@ -21,7 +21,13 @@ function getInitialCart() {
   return {};
 }
 
-export default function CustomerTableCart({ menuItems }: { menuItems: CustomerCartMenuItem[] }) {
+export default function CustomerTableCart({
+  menuItems,
+  tableNumber,
+}: {
+  menuItems: CustomerCartMenuItem[];
+  tableNumber: string;
+}) {
   const params = useParams<{ qrToken: string }>();
   const router = useRouter();
   const basePath = `/table/${params.qrToken}`;
@@ -87,7 +93,7 @@ export default function CustomerTableCart({ menuItems }: { menuItems: CustomerCa
 
   return (
     <CustomerMobileLayout>
-      <CustomerMobileHeader title="Your table cart" subtitle="Table 4 - shared with everyone seated here." />
+      <CustomerMobileHeader title="Your table cart" subtitle={`Table ${tableNumber} - shared with everyone seated here.`} />
 
       <div className="flex-1 overflow-y-auto p-4 pb-28">
         <div className="w-full">

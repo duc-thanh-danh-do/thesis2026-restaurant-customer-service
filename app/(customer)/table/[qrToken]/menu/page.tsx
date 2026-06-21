@@ -64,5 +64,11 @@ export default async function MenuPage({
     allergens: item.menuItemAllergens.map(({ allergen }) => allergen.name),
   }));
 
-  return <CustomerTableMenu menuItems={menuItems} />;
+  return (
+    <CustomerTableMenu
+      menuItems={menuItems}
+      restaurantName={table.restaurant.name}
+      tableNumber={table.tableNumber}
+    />
+  );
 }

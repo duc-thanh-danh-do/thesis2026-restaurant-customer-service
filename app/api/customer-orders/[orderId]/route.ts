@@ -19,6 +19,11 @@ export async function GET(
         orderItems: {
           orderBy: { id: "asc" },
         },
+        session: {
+          include: {
+            table: true,
+          },
+        },
       },
     });
 
@@ -30,6 +35,7 @@ export async function GET(
         status: order.status,
         total: Number(order.total),
         createdAt: order.createdAt,
+        tableNumber: order.session.table.tableNumber,
         items: order.orderItems.map((item) => ({
           id: item.id,
           name: item.name,

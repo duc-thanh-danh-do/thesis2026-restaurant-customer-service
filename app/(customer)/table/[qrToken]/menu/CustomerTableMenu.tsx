@@ -25,8 +25,12 @@ function getInitialCart() {
 
 export default function CustomerTableMenu({
   menuItems,
+  restaurantName,
+  tableNumber,
 }: {
   menuItems: CustomerMenuItem[];
+  restaurantName: string;
+  tableNumber: string;
 }) {
   const params = useParams<{ qrToken: string }>();
   const basePath = `/table/${params.qrToken}`;
@@ -61,7 +65,7 @@ export default function CustomerTableMenu({
   return (
     <CustomerMobileLayout>
       <CustomerMobileHeader
-        title="Bistro Aurora - Table 4"
+        title={`${restaurantName} - Table ${tableNumber}`}
         subtitle="Tap dishes to build your order."
         rightElement={
           <select

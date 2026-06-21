@@ -43,5 +43,5 @@ export default async function CartPage({
     price: Number(item.price),
   }));
 
-  return <CustomerTableCart menuItems={menuItems} />;
+  return <CustomerTableCart menuItems={menuItems} tableNumber={table.tableNumber} />;
 }
