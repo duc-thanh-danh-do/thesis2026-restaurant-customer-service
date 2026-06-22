@@ -19,8 +19,6 @@ interface MenuItem {
   price: number;
   isAvailable: boolean;
   dietary?: string | null;
-  // isVegetarian: boolean;
-  // isVegan: boolean;
   description?: string | null;
   imageUrl?: string | null;
 }
@@ -47,9 +45,6 @@ export default function MenuAdminPage() {
   };
 
   useEffect(() => {
-    const fetchItems = async () => {
-      const data = await getMenuItemsAction();
-    };
     fetchItems();
   }, []);
 
