@@ -78,6 +78,7 @@ export default function CustomerTableChat({
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isAssistantTyping, setIsAssistantTyping] = useState(false);
 
   useEffect(() => {
     async function loadSession() {
@@ -129,7 +130,7 @@ export default function CustomerTableChat({
 
   const sendMessage = async (content = message) => {
     const trimmedMessage = content.trim();
-    if (!trimmedMessage || !sessionToken) return;
+    if (!trimmedMessage || !sessionToken || isAssistantTyping) return;
 
     const now = new Date();
     setMessages((current) => [
@@ -142,6 +143,7 @@ export default function CustomerTableChat({
       },
     ]);
     setMessage("");
+    setIsAssistantTyping(true);
 
     try {
       const response = await fetch("/api/chat/messages", {
@@ -191,6 +193,8 @@ export default function CustomerTableChat({
           timestamp: new Date(),
         },
       ]);
+    } finally {
+      setIsAssistantTyping(false);
     }
   };
 
@@ -268,6 +272,27 @@ export default function CustomerTableChat({
               </div>
             </div>
           ))}
+          {isAssistantTyping ? (
+            <div className="flex justify-start">
+              <div className="flex max-w-[88%] items-start gap-2">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#438ed8]">
+                  <Bot className="h-4 w-4 text-white" />
+                </div>
+                <div
+                  className="rounded-2xl border border-[#d5e1ec] bg-white px-4 py-3"
+                  role="status"
+                  aria-live="polite"
+                  aria-label="Assistant is typing"
+                >
+                  <div className="flex h-5 items-center gap-1">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -279,7 +304,7 @@ export default function CustomerTableChat({
                 sendMessage("Which dishes are safe for my allergens?")
               }
               className="flex shrink-0 items-center gap-2 rounded-full border border-[#d5e1ec] bg-[#f5f9fc] px-3 py-2 text-sm"
-              disabled={!sessionToken}
+              disabled={!sessionToken || isAssistantTyping}
             >
               <Shield className="h-4 w-4 text-[#142653]" />
               Ask about allergens
@@ -287,7 +312,7 @@ export default function CustomerTableChat({
             <button
               onClick={() => sendMessage("Can I get water for the table?")}
               className="flex shrink-0 items-center gap-2 rounded-full border border-[#d5e1ec] bg-[#f5f9fc] px-3 py-2 text-sm"
-              disabled={!sessionToken}
+              disabled={!sessionToken || isAssistantTyping}
             >
               <Droplet className="h-4 w-4 text-[#142653]" />
               Ask for water
@@ -310,7 +335,7 @@ export default function CustomerTableChat({
             />
             <button
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#142653] disabled:bg-gray-300"
-              disabled={!message.trim() || !sessionToken}
+              disabled={!message.trim() || !sessionToken || isAssistantTyping}
             >
               <Send className="h-4 w-4 text-white" />
             </button>
