@@ -60,7 +60,7 @@ export default function AddDishDrawer({
         // Edit Menu Mode
         setName(initialData.name);
         setCategory(initialData.category || "STARTERS");
-        setPrice(initialData.price.toString());
+        setPrice(Number(initialData.price).toString());
         setDescription(initialData.description || "");
 
         if (initialData.dietary) {
