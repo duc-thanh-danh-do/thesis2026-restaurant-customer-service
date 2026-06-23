@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -37,16 +37,16 @@ export default function MenuAdminPage() {
 
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setIsLoading(true);
     const data = await getMenuItemsAction();
     setMenuItems(data);
     setIsLoading(false);
-  };
+  },[]);
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [fetchItems]);
 
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);

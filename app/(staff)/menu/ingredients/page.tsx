@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,14 +20,19 @@ export default function IngredientsPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const fetchIngredients = async () => {
+  // const fetchIngredients = async () => {
+  //   const data = await getIngredientsAction();
+  //   setIngredients(data);
+  // };
+
+  const fetchIngredients = useCallback(async () => {
     const data = await getIngredientsAction();
     setIngredients(data);
-  };
+  }, []);
 
   useEffect(() => {
     fetchIngredients();
-  }, []);
+  }, [fetchIngredients]);
 
   const showToast = (message: string) => {
     setToastMessage(message);

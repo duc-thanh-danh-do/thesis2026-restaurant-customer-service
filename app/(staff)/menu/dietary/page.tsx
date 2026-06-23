@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,14 +30,14 @@ export default function DietaryPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const fetchTags = async () => {
+  const fetchTags = useCallback(async () => {
     const tags = await getDietaryTagsAction();
     setDietaryTags(tags);
-  };
+  }, []);
 
   useEffect(() => {
     fetchTags();
-  }, []);
+  }, [fetchTags]);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -93,7 +93,6 @@ export default function DietaryPage() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6 w-full">
         <div className="max-w-[620px] mx-auto space-y-6">
-          
           {/* Add Tag Card */}
           <Card className="p-4 bg-white border border-[#d5e1ec] rounded-[20px]">
             <div className="space-y-3">
@@ -105,7 +104,7 @@ export default function DietaryPage() {
                   placeholder="e.g. Halal, Sugar-free"
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  disabled={isPending} 
+                  disabled={isPending}
                   className="flex-1 border-[#d5e1ec] rounded-lg"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !isPending) {
@@ -146,7 +145,7 @@ export default function DietaryPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeTag(tag)}
-                        disabled={isPending} 
+                        disabled={isPending}
                         className="p-2 hover:bg-red-50 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4 text-red-400" />
