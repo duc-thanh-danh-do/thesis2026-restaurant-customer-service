@@ -10,8 +10,6 @@ interface CreateMenuItemInput {
   description: string;
   dietary?: string;
   ingredients: string;
-  // isVegetarian: boolean;
-  // isVegan: boolean;
 }
 
 type DecimalLike = number | string | { toString(): string };
@@ -27,8 +25,6 @@ type MenuItemRow = {
   dietary: string | null
   imageUrl: string | null;
   isAvailable: boolean;
-  // isVegetarian: boolean;
-  // isVegan: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
 };

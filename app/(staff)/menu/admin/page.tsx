@@ -158,8 +158,6 @@ export default function MenuAdminPage() {
                               </div>
                               <div className="text-sm text-gray-600 truncate">
                                 €{item.price.toFixed(2)}
-                                {/* {item.isVegetarian && " · vegetarian"}
-                                {item.isVegan && " · vegan"} */}
                                 {item.dietary && ` · ${item.dietary.toLowerCase()}`}
                               </div>
                             </div>

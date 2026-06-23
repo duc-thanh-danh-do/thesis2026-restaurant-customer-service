@@ -1,28 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import MenuAdminHeader from "@/components/menu/MenuManagementHeader";
+import {
+  getDietaryTagsAction,
+  createDietaryTagAction,
+  deleteDietaryTagAction,
+} from "@/actions/catalog.action";
 
-const INITIAL_TAGS = [
-  "VEGAN",
-  "VEGETARIAN",
-  "BLUTEN-FREE",
-  "SPICY",
-  "HALAL",
-  "DAIRY-FREE",
-  "NUT-FREE",
-  "KOSHER",
-];
+// const INITIAL_TAGS = [
+//   "VEGAN",
+//   "VEGETARIAN",
+//   "BLUTEN-FREE",
+//   "SPICY",
+//   "HALAL",
+//   "DAIRY-FREE",
+//   "NUT-FREE",
+//   "KOSHER",
+// ];
 
 export default function DietaryPage() {
   const [newTag, setNewTag] = useState("");
-  const [dietaryTags, setDietaryTags] = useState(INITIAL_TAGS);
+  const [dietaryTags, setDietaryTags] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const fetchTags = async () => {
+    const tags = await getDietaryTagsAction();
+    setDietaryTags(tags);
+  };
+
+  useEffect(() => {
+    fetchTags();
+  }, []);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -33,26 +48,52 @@ export default function DietaryPage() {
 
   const addTag = () => {
     const formattedTag = newTag.trim().toUpperCase();
-    if (formattedTag && !dietaryTags.includes(formattedTag)) {
-      setDietaryTags([...dietaryTags, formattedTag]);
-      setNewTag("");
-      showToast(`Added ${formattedTag}`);
+
+    if (!formattedTag) {
+      showToast("Please enter a tag name!");
+      return;
     }
+
+    if (dietaryTags.includes(formattedTag)) {
+      showToast(`"${formattedTag}" already exists!`);
+      return;
+    }
+
+    startTransition(async () => {
+      setDietaryTags((prev) => [...prev, formattedTag]);
+      setNewTag("");
+
+      const result = await createDietaryTagAction(formattedTag);
+      if (result.success) {
+        showToast(`Added ${formattedTag}`);
+      } else {
+        fetchTags();
+        alert("Failed to save to database");
+      }
+    });
   };
 
   const removeTag = (tagToRemove: string) => {
-    setDietaryTags(dietaryTags.filter((t) => t !== tagToRemove));
-    showToast(`Deleted ${tagToRemove}`);
+    startTransition(async () => {
+      setDietaryTags((prev) => prev.filter((t) => t !== tagToRemove));
+
+      const result = await deleteDietaryTagAction(tagToRemove);
+      if (result.success) {
+        showToast(`Deleted ${tagToRemove}`);
+      } else {
+        fetchTags();
+        alert("Failed to delete from database");
+      }
+    });
   };
 
   return (
     <div className="flex-1 flex flex-col h-screen w-full bg-[#f5f9fc] overflow-hidden relative">
-      {/* Header */}
       <MenuAdminHeader />
 
-      {/* Dietary Tags */}
       <div className="flex-1 overflow-y-auto px-6 py-6 w-full">
         <div className="max-w-[620px] mx-auto space-y-6">
+          
           {/* Add Tag Card */}
           <Card className="p-4 bg-white border border-[#d5e1ec] rounded-[20px]">
             <div className="space-y-3">
@@ -64,20 +105,21 @@ export default function DietaryPage() {
                   placeholder="e.g. Halal, Sugar-free"
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
+                  disabled={isPending} 
                   className="flex-1 border-[#d5e1ec] rounded-lg"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" && !isPending) {
                       addTag();
                     }
                   }}
                 />
                 <Button
                   onClick={addTag}
-                  disabled={!newTag.trim()}
-                  className="bg-[#142653] hover:bg-[#13275a] text-white rounded-lg px-4"
+                  disabled={isPending}
+                  className="bg-[#142653] hover:bg-[#13275a] text-white rounded-lg px-4 transition-all disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Add
+                  {isPending ? "Adding..." : "Add"}
                 </Button>
               </div>
             </div>
@@ -91,7 +133,7 @@ export default function DietaryPage() {
             <div className="space-y-2">
               {[...dietaryTags]
                 .sort((a, b) => a.localeCompare(b))
-                .map((tag, index) => (
+                .map((tag) => (
                   <Card
                     key={tag}
                     className="p-3 bg-white border border-[#d5e1ec] rounded-lg shadow-sm"
@@ -104,7 +146,8 @@ export default function DietaryPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeTag(tag)}
-                        className="p-2 hover:bg-red-50"
+                        disabled={isPending} 
+                        className="p-2 hover:bg-red-50 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4 text-red-400" />
                       </Button>

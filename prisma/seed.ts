@@ -135,6 +135,68 @@ async function main() {
     ["Fish", "Found in tuna and other seafood toppings."],
   ];
 
+  const initialDietaryTags = [
+    "VEGAN",
+    "VEGETARIAN",
+    "GLUTEN-FREE",
+    "DAIRY-FREE",
+    "NUT-FREE",
+    "HALAL",
+    "KOSHER",
+    "SPICY",
+  ];
+
+  await prisma.dietaryCatalog.createMany({
+    data: initialDietaryTags.map((tag) => ({
+      name: tag,
+      restaurantId: restaurant.id,
+    })),
+    skipDuplicates: true,
+  });
+
+  const initialIngredients = [
+    "beets",
+    "goat cheese",
+    "walnuts",
+    "citrus vinaigrette",
+    "burrata",
+    "heritage tomatoes",
+    "basil",
+    "sourdough",
+    "carnaroli rice",
+    "porcini",
+    "thyme",
+    "parmesan",
+    "sea bass",
+    "fennel",
+    "lemon",
+    "capers",
+    "butter",
+    "orecchiette",
+    "n'duja",
+    "chili",
+    "pecorino",
+    "broccolini",
+    "garlic",
+    "potato",
+    "truffle oil",
+    "dark chocolate",
+    "vanilla ice cream",
+    "shortcrust",
+    "meringue",
+    "seasonal fruit",
+    "tempranillo",
+    "mineral water",
+  ];
+
+  await prisma.ingredientCatalog.createMany({
+    data: initialIngredients.map((tag) => ({
+      name: tag,
+      restaurantId: restaurant.id,
+    })),
+    skipDuplicates: true,
+  });
+
   const allergens = new Map<string, { id: number }>();
 
   for (const [name, description] of allergenData) {

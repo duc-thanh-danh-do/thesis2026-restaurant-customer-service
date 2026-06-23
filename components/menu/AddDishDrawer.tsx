@@ -1,11 +1,15 @@
 "use client";
 /* eslint-disable */
 
-import React, { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect } from "react";
 import {
   createMenuItemAction,
   editMenuItemAction,
 } from "@/actions/menu-item.action";
+import {
+  getDietaryTagsAction,
+  getIngredientsAction,
+} from "@/actions/catalog.action";
 
 interface AddDishDrawerProps {
   isOpen: boolean;
@@ -38,10 +42,20 @@ export default function AddDishDrawer({
   const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
 
+  const [dietaryTags, setDietaryTags] = useState<string[]>([]);
+  const [ingredientTags, setIngredientTags] = useState<string[]>([]);
+
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (isOpen) {
+      const fetchCatalogs = async () => {
+        const freshDietaries = await getDietaryTagsAction();
+        const freshIngredients = await getIngredientsAction();
+        setDietaryTags(freshDietaries);
+        setIngredientTags(freshIngredients);
+      };
+      fetchCatalogs();
       if (initialData) {
         // Edit Menu Mode
         setName(initialData.name);
@@ -106,8 +120,6 @@ export default function AddDishDrawer({
         description,
         dietary: selectedDietary.join(", "),
         ingredients: selectedIngredients.join(", "),
-      //   isVegetarian: selectedDietary.includes("VEGETARIAN"),
-      //   isVegan: selectedDietary.includes("VEGAN"),
       };
 
       let result;
@@ -125,51 +137,51 @@ export default function AddDishDrawer({
     });
   };
 
-  const dietaryTags = [
-    "VEGAN",
-    "VEGETARIAN",
-    "GLUTEN-FREE",
-    "DAIRY-FREE",
-    "NUT-FREE",
-    "HALAL",
-    "KOSHER",
-    "SPICY",
-  ];
+  // const dietaryTags = [
+  //   "VEGAN",
+  //   "VEGETARIAN",
+  //   "GLUTEN-FREE",
+  //   "DAIRY-FREE",
+  //   "NUT-FREE",
+  //   "HALAL",
+  //   "KOSHER",
+  //   "SPICY",
+  // ];
 
-  const ingredientTags = [
-    "beets",
-    "goat cheese",
-    "walnuts",
-    "citrus vinaigrette",
-    "burrata",
-    "heritage tomatoes",
-    "basil",
-    "sourdough",
-    "carnaroli rice",
-    "porcini",
-    "thyme",
-    "parmesan",
-    "sea bass",
-    "fennel",
-    "lemon",
-    "capers",
-    "butter",
-    "orecchiette",
-    "n'duja",
-    "chili",
-    "pecorino",
-    "broccolini",
-    "garlic",
-    "potato",
-    "truffle oil",
-    "dark chocolate",
-    "vanilla ice cream",
-    "shortcrust",
-    "meringue",
-    "seasonal fruit",
-    "tempranillo",
-    "mineral water",
-  ];
+  // const ingredientTags = [
+  //   "beets",
+  //   "goat cheese",
+  //   "walnuts",
+  //   "citrus vinaigrette",
+  //   "burrata",
+  //   "heritage tomatoes",
+  //   "basil",
+  //   "sourdough",
+  //   "carnaroli rice",
+  //   "porcini",
+  //   "thyme",
+  //   "parmesan",
+  //   "sea bass",
+  //   "fennel",
+  //   "lemon",
+  //   "capers",
+  //   "butter",
+  //   "orecchiette",
+  //   "n'duja",
+  //   "chili",
+  //   "pecorino",
+  //   "broccolini",
+  //   "garlic",
+  //   "potato",
+  //   "truffle oil",
+  //   "dark chocolate",
+  //   "vanilla ice cream",
+  //   "shortcrust",
+  //   "meringue",
+  //   "seasonal fruit",
+  //   "tempranillo",
+  //   "mineral water",
+  // ];
 
   const titleText = initialData ? "Edit dish" : "Add dish";
   const buttonText = initialData ? "Save changes" : "Add dish";
