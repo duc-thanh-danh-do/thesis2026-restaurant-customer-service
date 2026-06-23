@@ -22,6 +22,7 @@ interface OrderCardProps {
   time: string;
   initialStatus: string;
   items: OrderItem[];
+  onRefresh?: () => void; //Receiving updates
 }
 
 export default function OrderCard({
@@ -29,6 +30,7 @@ export default function OrderCard({
   time,
   initialStatus,
   items,
+  onRefresh,
 }: OrderCardProps) {
   const [optimisticStatus, setOptimisticStatus] = useState(initialStatus);
   const [optimisticItems, setOptimisticItems] = useState(items);
@@ -81,7 +83,10 @@ export default function OrderCard({
                 startTransition(async () => {
                   setOptimisticStatus(step);
                   const numericId = parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                  await updateOrderStatus(numericId, step);
+                  const result = await updateOrderStatus(numericId, step);
+                  if (result.success && onRefresh) {
+                    onRefresh();
+                  }
                 });
               }}
               className="flex-1 flex items-center group cursor-pointer border-none bg-transparent p-0 text-left"
@@ -158,11 +163,14 @@ export default function OrderCard({
                       startTransition(async () => {
                         const numericOrderId =
                           parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        await updateItemQuantityAction(
+                        const result = await updateItemQuantityAction(
                           numericOrderId,
                           item.id,
                           newQuantity
                         );
+                        if (result.success && onRefresh) {
+                          onRefresh();
+                        }
                       });
                     }}
                     className="h-6 w-6 rounded-full border-slate-300"
@@ -192,11 +200,14 @@ export default function OrderCard({
                       startTransition(async () => {
                         const numericOrderId =
                           parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        await updateItemQuantityAction(
+                        const result = await updateItemQuantityAction(
                           numericOrderId,
                           item.id,
                           newQuantity
                         );
+                        if (result.success && onRefresh) {
+                          onRefresh();
+                        }
                       });
                     }}
                     className="h-6 w-6 rounded-full border-slate-300"

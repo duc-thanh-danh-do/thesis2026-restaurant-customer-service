@@ -10,6 +10,7 @@ interface RequestCardProps {
   text: string;
   time: string;
   initialStatus: string;
+  onRefresh?: () => void;
 }
 
 const STATUSES = ["Waiting", "In progress", "Resolved"];
@@ -19,6 +20,7 @@ export default function RequestCard({
   text,
   time,
   initialStatus,
+  onRefresh,
 }: RequestCardProps) {
   const [isPending, startTransition] = useTransition();
   const [optimisticStatus, setOptimisticStatus] = useState(initialStatus);
@@ -31,6 +33,10 @@ export default function RequestCard({
       const result = await updateRequestStatus(safeId, newStatus);
       if (!result.success) {
         setOptimisticStatus(initialStatus);
+      } else {
+        if (onRefresh) {
+          onRefresh();
+        }
       }
     });
   };

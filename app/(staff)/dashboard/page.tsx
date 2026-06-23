@@ -1,61 +1,69 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import RequestCard from "@/components/staff/RequestCard";
 import OrderCard from "@/components/staff/OrderCard";
-import { getTestOrder } from "@/actions/customer-order.action";
-import { getTableRequestsAction } from "@/actions/customer-request.action";
+// import { getTestOrder, } from "@/actions/customer-order.action";
+import {
+  getTableOrderAction,
+  getActiveOrdersAction,
+} from "@/actions/customer-order.action";
+import {
+  getTableRequestsAction,
+  getActiveRequestsAction,
+} from "@/actions/customer-request.action";
+import { getAllTablesAction } from "@/actions/restaurant-table.action";
 import { AlertTriangle, ChevronRight, Utensils, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Mock data matching description
-const mockTables = [
-  {
-    id: "4",
-    name: "Table 4",
-    preview: "Assistant: Your request has been sent to the staff.",
-    time: "2 min ago",
-    hasWarning: true,
-    badges: [
-      { text: "Waiting", color: "bg-amber-500" },
-      { text: "#A1 · Preparing", color: "bg-slate-600" },
-    ],
-    selected: false,
-  },
-  {
-    id: "7",
-    name: "Table 7",
-    preview: "I've forwarded this to a staff member to…",
-    time: "5 min ago",
-    hasWarning: true,
-    badges: [
-      { text: "In progress", color: "bg-slate-600" },
-      { text: "#A2 · Ready", color: "bg-blue-500" },
-    ],
-    selected: false,
-  },
-  {
-    id: "12",
-    name: "Table 12",
-    preview: "Staff: On the way!",
-    time: "10 min ago",
-    hasWarning: false,
-    badges: [{ text: "Resolved", color: "bg-green-500" }],
-    selected: false,
-  },
-  {
-    id: "2",
-    name: "Table 2",
-    preview: "Assistant: Welcome to Bistro Aurora, table 2.",
-    time: "23 min ago",
-    hasWarning: false,
-    badges: [],
-    selected: false,
-  },
-];
+// const mockTables = [
+//   {
+//     id: "4",
+//     name: "Table 4",
+//     preview: "Assistant: Your request has been sent to the staff.",
+//     time: "2 min ago",
+//     hasWarning: true,
+//     badges: [
+//       { text: "Waiting", color: "bg-amber-500" },
+//       { text: "#A1 · Preparing", color: "bg-slate-600" },
+//     ],
+//     selected: false,
+//   },
+//   {
+//     id: "7",
+//     name: "Table 7",
+//     preview: "I've forwarded this to a staff member to…",
+//     time: "5 min ago",
+//     hasWarning: true,
+//     badges: [
+//       { text: "In progress", color: "bg-slate-600" },
+//       { text: "#A2 · Ready", color: "bg-blue-500" },
+//     ],
+//     selected: false,
+//   },
+//   {
+//     id: "12",
+//     name: "Table 12",
+//     preview: "Staff: On the way!",
+//     time: "10 min ago",
+//     hasWarning: false,
+//     badges: [{ text: "Resolved", color: "bg-green-500" }],
+//     selected: false,
+//   },
+//   {
+//     id: "2",
+//     name: "Table 2",
+//     preview: "Assistant: Welcome to Bistro Aurora, table 2.",
+//     time: "23 min ago",
+//     hasWarning: false,
+//     badges: [],
+//     selected: false,
+//   },
+// ];
 
 const mockMessages = [
   {
@@ -98,30 +106,27 @@ const mockMessages = [
 function TableList({
   tables,
   onSelectTable,
+  selectedId,
 }: {
-  tables: typeof mockTables;
+  tables: any[];
   onSelectTable: (id: string) => void;
+  selectedId: string | null;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
   return (
     <div className="space-y-3">
       {tables.map((table) => (
         <div
           key={table.id}
-          onClick={() => {
-            setSelectedId(table.id);
-            onSelectTable(table.id);
-          }}
+          onClick={() => onSelectTable(table.id)}
           className={`
-            cursor-pointer rounded-lg p-4 transition-all duration-200
-            ${selectedId === table.id ? "bg-white/10" : "hover:bg-white/5"}
-          `}
+          cursor-pointer rounded-lg p-4 transition-all duration-200
+          ${selectedId === table.id ? "bg-white/10" : "hover:bg-white/5"}
+        `}
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               {table.hasWarning && (
-                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                <AlertTriangle className={`h-4 w-4 ${table.warningColor || "text-amber-500"}`} />
               )}
               <span className="font-semibold text-white">{table.name}</span>
             </div>
@@ -131,7 +136,7 @@ function TableList({
             {table.preview}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {table.badges.map((badge, i) => (
+            {table.badges.map((badge: any, i: number) => (
               <span
                 key={i}
                 className={`text-xs px-2 py-0.5 rounded-full text-white ${badge.color}`}
@@ -249,24 +254,31 @@ function ChatPanel({ tableId }: { tableId: string | null }) {
   );
 }
 
-function DetailsPanel({ tableId }: { tableId: string | null }) {
+function DetailsPanel({
+  tableId,
+  onDataChange,
+}: {
+  tableId: string | null;
+  onDataChange: () => void;
+}) {
   const [realOrder, setRealOrder] = useState<any>(null);
   const [realRequests, setRealRequests] = useState<any[]>([]);
 
-  useEffect(() => {
+  const fetchDetails = useCallback(() => {
     if (!tableId) return;
-
-    // get orders
-    getTestOrder().then((data) => {
-      if (data) {
-        setRealOrder(data as any);
-      }
-    });
-
-    getTableRequestsAction(tableId).then((data) => {
-      setRealRequests(data);
-    });
+    getTableOrderAction(tableId).then((data) => setRealOrder(data));
+    getTableRequestsAction(tableId).then((data) => setRealRequests(data));
   }, [tableId]);
+
+  useEffect(() => {
+    fetchDetails();
+  }, [fetchDetails]);
+
+  const handleActionSuccess = () => {
+    fetchDetails();
+    onDataChange();
+  };
+
   if (!tableId) {
     return (
       <div className="flex min-h-[320px] h-full items-center justify-center rounded-xl bg-slate-50">
@@ -289,6 +301,7 @@ function DetailsPanel({ tableId }: { tableId: string | null }) {
               time={realOrder.time}
               initialStatus={realOrder.status}
               items={realOrder.items}
+              onRefresh={handleActionSuccess}
             />
           ) : (
             <div className="text-sm text-slate-400 p-4 border border-dashed border-slate-200 rounded-lg text-center">
@@ -324,6 +337,7 @@ function DetailsPanel({ tableId }: { tableId: string | null }) {
                     text={reqType}
                     time={timeStr}
                     initialStatus={req.status}
+                    onRefresh={handleActionSuccess}
                   />
                 );
               })
@@ -336,7 +350,87 @@ function DetailsPanel({ tableId }: { tableId: string | null }) {
 }
 
 export default function StaffDashboardPage() {
-  const [selectedTableId, setSelectedTableId] = useState<string | null>("4");
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [activeTables, setActiveTables] = useState<any[]>([]);
+
+  const fetchDashboardData = useCallback(async () => {
+    const [rawTables, rawOrders, rawRequests] = await Promise.all([
+      getAllTablesAction(),
+      getActiveOrdersAction(),
+      getActiveRequestsAction(),
+    ]);
+
+    const formattedTables = rawTables.map((t: any) => {
+      const tableOrders = rawOrders.filter(
+        (o: any) => o.session?.table?.tableNumber === t.tableNumber
+      );
+
+      const tableRequests = rawRequests.filter(
+        (req: any) => req.session?.table?.tableNumber === t.tableNumber
+      );
+
+      let hasWarning = false;
+      const badges: any[] = [];
+      let warningColor = "text-amber-500";
+      let latestTime = "";
+
+      tableOrders.forEach((order: any) => {
+        if (!latestTime && order.createdAt) {
+          latestTime = new Date(order.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        }
+        if (order.status === "Placed") {
+          hasWarning = true;
+          badges.push({ text: "Order: Placed", color: "bg-amber-500" });
+        } else if (order.status === "Preparing") {
+          badges.push({ text: "Order: Preparing", color: "bg-slate-500" });
+        } else if (order.status === "Ready") {
+          badges.push({ text: "Order: Ready", color: "bg-blue-500" });
+        }
+      });
+
+      tableRequests.forEach((req: any) => {
+        if (!latestTime && req.createdAt) {
+          latestTime = new Date(req.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        }
+
+        if (req.status === "Waiting") {
+          hasWarning = true;
+          warningColor = "text-red-500";
+          badges.push({
+            text: `Req: ${req.requestType.replace("_", " ")}`,
+            color: "bg-red-500",
+          });
+        } else if (req.status === "In progress") {
+          badges.push({ text: "Req: In Progress", color: "bg-slate-500" });
+        }
+      });
+
+      return {
+        id: t.tableNumber,
+        name: `Table ${t.tableNumber}`,
+        time: latestTime,
+        hasWarning,
+        warningColor,
+        badges,
+      };
+    });
+
+    setActiveTables(formattedTables);
+
+    if (formattedTables.length > 0 && !selectedTableId) {
+      setSelectedTableId(formattedTables[0].id);
+    }
+  }, [selectedTableId]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return (
     <div className="flex min-h-[calc(100dvh-73px)] flex-col bg-slate-100 xl:flex-row">
@@ -346,22 +440,18 @@ export default function StaffDashboardPage() {
           <p className="text-xs font-medium text-blue-300 uppercase tracking-wide">
             Staff Dashboard
           </p>
-          <h1 className="text-xl font-bold text-white mt-1">Bistro Aurora</h1>
           <p className="text-sm text-blue-200 mt-1">
-            2 need attention · 2 open orders
+            {activeTables.length} tables active
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          className="mx-5 mb-4 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Menu admin
-        </Button>
-
         <ScrollArea className="min-h-0 flex-1 px-5 pb-5">
-          <TableList tables={mockTables} onSelectTable={setSelectedTableId} />
+          {/* activeTables */}
+          <TableList
+            tables={activeTables}
+            onSelectTable={setSelectedTableId}
+            selectedId={selectedTableId}
+          />
         </ScrollArea>
       </div>
 
@@ -374,7 +464,10 @@ export default function StaffDashboardPage() {
 
         {/* Details Panel */}
         <div className="w-full overflow-hidden p-3 pt-0 sm:p-4 sm:pt-0 lg:w-[340px] lg:pt-4">
-          <DetailsPanel tableId={selectedTableId} />
+          <DetailsPanel
+            tableId={selectedTableId}
+            onDataChange={fetchDashboardData}
+          />
         </div>
       </div>
     </div>

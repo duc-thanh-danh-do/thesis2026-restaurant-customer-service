@@ -53,6 +53,52 @@ export async function getTestOrder() {
   }
 }
 
+export async function getTableOrderAction(tableNumber: string) {
+  try {
+    const order = await prisma.order.findFirst({
+      where: {
+        session: {
+          table: {
+            tableNumber: tableNumber,
+          },
+        },
+        status: {
+          notIn: ["Served", "Paid", "Cancelled"],
+        },
+      },
+      include: {
+        orderItems: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!order) return null;
+
+    return {
+      id: order.id.toString(),
+      time: order.createdAt
+        ? new Date(order.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Just now",
+      total: Number(order.total),
+      status: order.status,
+      items: order.orderItems.map((item: OrderItemRow) => ({
+        id: item.id,
+        name: item.name,
+        price: Number(item.price),
+        quantity: item.quantity,
+      })),
+    };
+  } catch (error) {
+    console.error(`Failed to fetch order for table ${tableNumber}:`, error);
+    return null;
+  }
+}
+
 export async function updateItemQuantityAction(
   orderId: number,
   itemId: number,
@@ -87,5 +133,40 @@ export async function updateItemQuantityAction(
   } catch (error) {
     console.error("Failed to update quantity:", error);
     return { success: false, error: "Failed to update item" };
+  }
+}
+
+export async function getActiveOrdersAction() {
+  try {
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        status: {
+          notIn: ["Served", "Paid", "Cancelled"],
+        },
+      },
+      include: {
+        session: {
+          include: {
+            table: true,
+          },
+        },
+        orderItems: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    return activeOrders.map((order) => ({
+      ...order,
+      total: Number(order.total),
+      orderItems: order.orderItems.map((item) => ({
+        ...item,
+        price: Number(item.price),
+      })),
+    }));
+  } catch (error) {
+    console.error("Failed to fetch active orders:", error);
+    return [];
   }
 }
