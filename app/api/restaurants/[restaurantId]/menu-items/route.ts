@@ -13,7 +13,8 @@ export async function GET(
     const filters = menuItemFilterSchema.parse({
       category: searchParams.get("category") ?? undefined,
       isAvailable: searchParams.get("isAvailable") ?? undefined,
-      isVegetarian: searchParams.get("isVegetarian") ?? undefined,
+      // isVegetarian: searchParams.get("isVegetarian") ?? undefined,
+      dietary: searchParams.get("dietary") ?? undefined,
     });
 
     return Response.json(
@@ -23,10 +24,11 @@ export async function GET(
           filters.isAvailable === undefined
             ? undefined
             : filters.isAvailable === "true",
-        isVegetarian:
-          filters.isVegetarian === undefined
-            ? undefined
-            : filters.isVegetarian === "true",
+        // isVegetarian:
+        //   filters.isVegetarian === undefined
+        //     ? undefined
+        //     : filters.isVegetarian === "true",
+        dietary: filters.dietary,
       }),
     );
   } catch (error) {

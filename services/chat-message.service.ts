@@ -122,8 +122,9 @@ function buildGroundedContext(restaurant: RestaurantContext) {
               `  Category: ${item.category ?? "Not available"}`,
               `  Price: ${item.price.toString()}`,
               `  Available: ${item.isAvailable ? "yes" : "no"}`,
-              `  Vegetarian: ${item.isVegetarian ? "yes" : "no"}`,
-              `  Vegan: ${item.isVegan ? "yes" : "no"}`,
+              // `  Vegetarian: ${item.isVegetarian ? "yes" : "no"}`,
+              // `  Vegan: ${item.isVegan ? "yes" : "no"}`,
+              `  Dietary tags: ${item.dietary ?? "None"}`,
               `  Ingredients: ${item.ingredients ?? "Not available"}`,
               `  Allergens: ${allergens || "None listed"}`,
             ].join("\n");
@@ -184,8 +185,8 @@ function buildFallbackGroundedContext() {
         `  Category: ${item.category ?? "Not available"}`,
         `  Price: ${item.price.toFixed(2)}`,
         `  Available: ${item.isAvailable ? "yes" : "no"}`,
-        `  Vegetarian: ${item.isVegetarian ? "yes" : "no"}`,
-        `  Vegan: ${item.isVegan ? "yes" : "no"}`,
+        // `  Vegetarian: ${item.isVegetarian ? "yes" : "no"}`,
+        // `  Vegan: ${item.isVegan ? "yes" : "no"}`,
         `  Ingredients: ${item.ingredients ?? "Not available"}`,
         `  Allergens: ${allergens || "None listed"}`,
       ].join("\n");

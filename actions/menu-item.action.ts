@@ -10,8 +10,6 @@ interface CreateMenuItemInput {
   description: string;
   dietary?: string;
   ingredients: string;
-  isVegetarian: boolean;
-  isVegan: boolean;
 }
 
 type DecimalLike = number | string | { toString(): string };
@@ -24,10 +22,9 @@ type MenuItemRow = {
   category: string | null;
   price: DecimalLike;
   ingredients: string | null;
+  dietary: string | null
   imageUrl: string | null;
   isAvailable: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -46,9 +43,7 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
         price: data.price,
         description: data.description,
         ingredients: data.ingredients,
-        dietary: data.dietary,
-        isVegetarian: data.isVegetarian,
-        isVegan: data.isVegan,
+        dietary: data.dietary, 
         isAvailable: true,
       },
     });
@@ -135,8 +130,8 @@ export async function editMenuItemAction(id: number, data: any) {
         price: data.price,
         category: data.category,
         dietary: data.dietary,
-        isVegetarian: data.isVegetarian,
-        isVegan: data.isVegan,
+        // isVegetarian: data.isVegetarian,
+        // isVegan: data.isVegan,
         ingredients: data.ingredients,
       },
     });
@@ -144,8 +139,8 @@ export async function editMenuItemAction(id: number, data: any) {
     revalidatePath("/menu/admin");
     return { success: true, data: {
       ...editItem,
-      price: Number(editItem.price)
-    } };
+      price: Number(editItem.price), }
+    }
   } catch (error) {
     console.error("Failed to update dish:", error);
     return { success: false, error: "Failed to update dish" };

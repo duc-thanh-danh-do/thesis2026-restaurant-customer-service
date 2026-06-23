@@ -19,6 +19,9 @@ model Restaurant {
   menuItems     MenuItem[]
   knowledgeBase RestaurantKnowledgeBase[]
 
+  ingredientCatalogs IngredientCatalog[]
+  dietaryCatalogs    DietaryCatalog[]
+
   @@map("restaurants")
 }
 
@@ -194,4 +197,20 @@ model OrderItem {
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
+}
+
+model IngredientCatalog {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  name         String     @db.VarChar(100)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  @@map("ingredient_catalog")
+}
+
+model DietaryCatalog {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  name         String     @db.VarChar(100)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  @@map("dietary_catalog")
 }

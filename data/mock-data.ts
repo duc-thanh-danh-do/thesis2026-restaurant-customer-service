@@ -5,7 +5,7 @@ export const MENU_ITEMS = [
     price: 9.50,
     description: 'Heirloom beets, goat cheese, walnuts, citrus vinaigrette.',
     category: 'STARTERS',
-    tags: ['VEGETARIAN', 'GLUTEN-FREE'],
+    dietary: ['VEGETARIAN', 'GLUTEN-FREE'],
     allergens: ['DAIRY', 'NUTS']
   },
   {
@@ -14,7 +14,7 @@ export const MENU_ITEMS = [
     price: 11.00,
     description: 'Creamy burrata, heritage tomatoes, basil oil, sourdough.',
     category: 'STARTERS',
-    tags: ['VEGETARIAN', 'DAIRY'],
+    dietary: ['VEGETARIAN', 'DAIRY'],
     allergens: ['GLUTEN', 'DAIRY']
   },
   {
@@ -23,7 +23,7 @@ export const MENU_ITEMS = [
     price: 17.00,
     description: 'Carnaroli rice, porcini, thyme, parmesan.',
     category: 'MAINS',
-    tags: ['VEGETARIAN', 'GLUTEN-FREE'],
+    dietary: ['VEGETARIAN', 'GLUTEN-FREE'],
     allergens: ['DAIRY']
   },
   {
@@ -32,7 +32,7 @@ export const MENU_ITEMS = [
     price: 24.00,
     description: 'Sea bass fillet, fennel, lemon butter, capers.',
     category: 'MAINS',
-    tags: ['GLUTEN-FREE'],
+    dietary: ['GLUTEN-FREE'],
     allergens: ['FISH', 'DAIRY']
   },
   {
@@ -41,7 +41,7 @@ export const MENU_ITEMS = [
     price: 16.00,
     description: 'N\'duja, chili, pecorino, fresh basil.',
     category: 'MAINS',
-    tags: ['SPICY'],
+    dietary: ['SPICY'],
     allergens: ['GLUTEN', 'DAIRY']
   },
   {
@@ -50,7 +50,7 @@ export const MENU_ITEMS = [
     price: 6.00,
     description: 'Charred broccolini, garlic, chili flakes.',
     category: 'SIDES',
-    tags: ['VEGAN', 'GLUTEN-FREE', 'SPICY'],
+    dietary: ['VEGAN', 'GLUTEN-FREE', 'SPICY'],
     allergens: []
   },
   {
@@ -59,7 +59,7 @@ export const MENU_ITEMS = [
     price: 7.00,
     description: 'Crispy fries, truffle oil, parmesan.',
     category: 'SIDES',
-    tags: ['VEGETARIAN'],
+    dietary: ['VEGETARIAN'],
     allergens: ['DAIRY']
   },
   {
@@ -68,7 +68,7 @@ export const MENU_ITEMS = [
     price: 8.50,
     description: 'Warm chocolate cake, vanilla ice cream.',
     category: 'DESSERTS',
-    tags: ['VEGETARIAN'],
+    dietary: ['VEGETARIAN'],
     allergens: ['GLUTEN', 'DAIRY', 'EGGS']
   },
   {
@@ -77,7 +77,7 @@ export const MENU_ITEMS = [
     price: 7.50,
     description: 'Zesty lemon curd, shortcrust, meringue.',
     category: 'DESSERTS',
-    tags: ['VEGETARIAN'],
+    dietary: ['VEGETARIAN'],
     allergens: ['GLUTEN', 'DAIRY', 'EGGS']
   },
   {
@@ -86,7 +86,7 @@ export const MENU_ITEMS = [
     price: 6.00,
     description: 'Three scoops of seasonal fruit sorbet.',
     category: 'DESSERTS',
-    tags: ['VEGAN', 'GLUTEN-FREE', 'DAIRY-FREE'],
+    dietary: ['VEGAN', 'GLUTEN-FREE', 'DAIRY-FREE'],
     allergens: []
   },
   {
@@ -95,7 +95,7 @@ export const MENU_ITEMS = [
     price: 7.00,
     description: 'Tempranillo, Rioja, Spain.',
     category: 'DRINKS',
-    tags: [],
+    dietary: [],
     allergens: ['SULPHITES']
   },
   {
@@ -104,7 +104,7 @@ export const MENU_ITEMS = [
     price: 4.00,
     description: 'Premium Italian mineral water.',
     category: 'DRINKS',
-    tags: [],
+    dietary: [],
     allergens: []
   }
 ];

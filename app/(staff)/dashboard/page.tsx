@@ -95,29 +95,6 @@ const mockMessages = [
   },
 ];
 
-// const mockOrder = {
-//   id: "#A1",
-//   time: "19 min ago",
-//   total: 26.5,
-//   status: "Preparing" as const,
-//   items: [
-//     { id: 1, name: "Wild Mushroom Risotto", price: 17.0, quantity: 1 },
-//     { id: 2, name: "Roasted Beet Salad", price: 9.5, quantity: 1 },
-//   ],
-// };
-
-// const mockRequests = [
-//   {
-//     id: "bill",
-//     text: "Request bill",
-//     time: "3 min ago",
-//     status: "Waiting" as const,
-//     badges: ["Waiting", "In progress", "Resolved"],
-//   },
-// ];
-
-// const stepStatuses = ["Placed", "Preparing", "Ready", "Served"];
-
 function TableList({
   tables,
   onSelectTable,

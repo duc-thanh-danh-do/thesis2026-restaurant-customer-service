@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,8 +18,7 @@ interface MenuItem {
   category: string | null;
   price: number;
   isAvailable: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
+  dietary?: string | null;
   description?: string | null;
   imageUrl?: string | null;
 }
@@ -38,16 +37,16 @@ export default function MenuAdminPage() {
 
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setIsLoading(true);
     const data = await getMenuItemsAction();
     setMenuItems(data);
     setIsLoading(false);
-  };
+  },[]);
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [fetchItems]);
 
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
@@ -159,8 +158,7 @@ export default function MenuAdminPage() {
                               </div>
                               <div className="text-sm text-gray-600 truncate">
                                 €{item.price.toFixed(2)}
-                                {item.isVegetarian && " · vegetarian"}
-                                {item.isVegan && " · vegan"}
+                                {item.dietary && ` · ${item.dietary.toLowerCase()}`}
                               </div>
                             </div>
                           </div>

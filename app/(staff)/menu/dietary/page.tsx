@@ -6,33 +6,38 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// import { INGREDIENTS } from "@/data/mock-data";
 import MenuAdminHeader from "@/components/menu/MenuManagementHeader";
 import {
-  getIngredientsAction,
-  createIngredientAction,
-  deleteIngredientAction,
+  getDietaryTagsAction,
+  createDietaryTagAction,
+  deleteDietaryTagAction,
 } from "@/actions/catalog.action";
 
-export default function IngredientsPage() {
-  const [newIngredient, setNewIngredient] = useState("");
-  const [ingredients, setIngredients] = useState<string[]>([]);
+// const INITIAL_TAGS = [
+//   "VEGAN",
+//   "VEGETARIAN",
+//   "BLUTEN-FREE",
+//   "SPICY",
+//   "HALAL",
+//   "DAIRY-FREE",
+//   "NUT-FREE",
+//   "KOSHER",
+// ];
+
+export default function DietaryPage() {
+  const [newTag, setNewTag] = useState("");
+  const [dietaryTags, setDietaryTags] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // const fetchIngredients = async () => {
-  //   const data = await getIngredientsAction();
-  //   setIngredients(data);
-  // };
-
-  const fetchIngredients = useCallback(async () => {
-    const data = await getIngredientsAction();
-    setIngredients(data);
+  const fetchTags = useCallback(async () => {
+    const tags = await getDietaryTagsAction();
+    setDietaryTags(tags);
   }, []);
 
   useEffect(() => {
-    fetchIngredients();
-  }, [fetchIngredients]);
+    fetchTags();
+  }, [fetchTags]);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -41,42 +46,42 @@ export default function IngredientsPage() {
     }, 2000);
   };
 
-  const addIngredient = () => {
-    const formattedTag = newIngredient.trim().toLowerCase();
+  const addTag = () => {
+    const formattedTag = newTag.trim().toUpperCase();
 
     if (!formattedTag) {
-      showToast("Please enter an ingredient name!");
+      showToast("Please enter a tag name!");
       return;
     }
 
-    if (ingredients.includes(formattedTag)) {
+    if (dietaryTags.includes(formattedTag)) {
       showToast(`"${formattedTag}" already exists!`);
       return;
     }
 
     startTransition(async () => {
-      setIngredients((prev) => [...prev, formattedTag]);
-      setNewIngredient("");
+      setDietaryTags((prev) => [...prev, formattedTag]);
+      setNewTag("");
 
-      const result = await createIngredientAction(formattedTag);
+      const result = await createDietaryTagAction(formattedTag);
       if (result.success) {
         showToast(`Added ${formattedTag}`);
       } else {
-        fetchIngredients();
+        fetchTags();
         alert("Failed to save to database");
       }
     });
   };
 
-  const removeIngredient = (tagToRemove: string) => {
+  const removeTag = (tagToRemove: string) => {
     startTransition(async () => {
-      setIngredients((prev) => prev.filter((t) => t !== tagToRemove));
+      setDietaryTags((prev) => prev.filter((t) => t !== tagToRemove));
 
-      const result = await deleteIngredientAction(tagToRemove);
+      const result = await deleteDietaryTagAction(tagToRemove);
       if (result.success) {
         showToast(`Deleted ${tagToRemove}`);
       } else {
-        fetchIngredients();
+        fetchTags();
         alert("Failed to delete from database");
       }
     });
@@ -88,27 +93,27 @@ export default function IngredientsPage() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6 w-full">
         <div className="max-w-[620px] mx-auto space-y-6">
-          {/* Add Ingredient Card */}
+          {/* Add Tag Card */}
           <Card className="p-4 bg-white border border-[#d5e1ec] rounded-[20px]">
             <div className="space-y-3">
               <Label className="text-sm font-medium text-[#142653]">
-                Add ingredient
+                Add dietary tag
               </Label>
               <div className="flex gap-3">
                 <Input
-                  placeholder="e.g. Garlic, Olive oil, Basil"
-                  value={newIngredient}
-                  onChange={(e) => setNewIngredient(e.target.value)}
+                  placeholder="e.g. Halal, Sugar-free"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
                   disabled={isPending}
                   className="flex-1 border-[#d5e1ec] rounded-lg"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !isPending) {
-                      addIngredient();
+                      addTag();
                     }
                   }}
                 />
                 <Button
-                  onClick={addIngredient}
+                  onClick={addTag}
                   disabled={isPending}
                   className="bg-[#142653] hover:bg-[#13275a] text-white rounded-lg px-4 transition-all disabled:opacity-50"
                 >
@@ -122,10 +127,10 @@ export default function IngredientsPage() {
           {/* Catalog */}
           <div className="space-y-3">
             <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              CATALOG ({ingredients.length})
+              CATALOG ({dietaryTags.length})
             </div>
             <div className="space-y-2">
-              {[...ingredients]
+              {[...dietaryTags]
                 .sort((a, b) => a.localeCompare(b))
                 .map((tag) => (
                   <Card
@@ -139,7 +144,7 @@ export default function IngredientsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeIngredient(tag)}
+                        onClick={() => removeTag(tag)}
                         disabled={isPending}
                         className="p-2 hover:bg-red-50 disabled:opacity-50"
                       >
