@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { revalidatePath } from "next/cache";
 
 interface CreateMenuItemInput {
@@ -22,7 +23,7 @@ type MenuItemRow = {
   category: string | null;
   price: DecimalLike;
   ingredients: string | null;
-  dietary: string | null
+  dietary: string | null;
   imageUrl: string | null;
   isAvailable: boolean;
   createdAt: Date | null;
@@ -32,6 +33,13 @@ type MenuItemRow = {
 type MenuItemActionResult = Omit<MenuItemRow, "price"> & {
   price: number;
 };
+
+function serializeMenuItem(item: MenuItemRow): MenuItemActionResult {
+  return {
+    ...item,
+    price: Number(item.price),
+  };
+}
 
 export async function createMenuItemAction(data: CreateMenuItemInput) {
   try {
@@ -43,7 +51,7 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
         price: data.price,
         description: data.description,
         ingredients: data.ingredients,
-        dietary: data.dietary, 
+        dietary: data.dietary,
         isAvailable: true,
       },
     });
@@ -52,12 +60,13 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
 
     return {
       success: true,
-      data: {
-        ...newItem,
-        price: Number(newItem.price),
-      },
+      data: serializeMenuItem(newItem),
     };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error("Failed to add menu:", error);
     return { success: false, error: "Failed to create menu item" };
   }
@@ -65,16 +74,15 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
 
 export async function getMenuItemsAction(): Promise<MenuItemActionResult[]> {
   try {
-    const items = (await prisma.menuItem.findMany({
+    const items = await prisma.menuItem.findMany({
       where: { restaurantId: 1 },
       orderBy: { id: "desc" },
-    })) as MenuItemRow[];
+    });
 
-    return items.map((item) => ({
-      ...item,
-      price: Number(item.price),
-    }));
+    return items.map((item) => serializeMenuItem(item));
   } catch (error) {
+    if (isDatabaseUnavailable(error)) return [];
+
     console.error("Failed to get menu:", error);
     return [];
   }
@@ -94,6 +102,10 @@ export async function deleteMenuItemAction(id: number) {
     revalidatePath("/menu/admin");
     return { success: true };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error("Failed to delete dish:", error);
     return { success: false, error: "Failed to delete dish" };
   }
@@ -113,6 +125,10 @@ export async function toggleMenuItemAvailabilityAction(
     revalidatePath("/menu/admin");
     return { success: true };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error("Failed to change the availability:", error);
     return { success: false, error: "Failed to toggle availability" };
   }
@@ -130,18 +146,17 @@ export async function editMenuItemAction(id: number, data: any) {
         price: data.price,
         category: data.category,
         dietary: data.dietary,
-        // isVegetarian: data.isVegetarian,
-        // isVegan: data.isVegan,
         ingredients: data.ingredients,
       },
     });
 
     revalidatePath("/menu/admin");
-    return { success: true, data: {
-      ...editItem,
-      price: Number(editItem.price), }
-    }
+    return { success: true, data: serializeMenuItem(editItem) };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error("Failed to update dish:", error);
     return { success: false, error: "Failed to update dish" };
   }

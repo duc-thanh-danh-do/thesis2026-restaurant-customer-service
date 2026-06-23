@@ -45,6 +45,7 @@ export default function MenuAdminPage() {
   },[]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchItems();
   }, [fetchItems]);
 
