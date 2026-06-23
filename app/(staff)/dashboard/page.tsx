@@ -126,7 +126,11 @@ function TableList({
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               {table.hasWarning && (
-                <AlertTriangle className={`h-4 w-4 ${table.warningColor || "text-amber-500"}`} />
+                <AlertTriangle
+                  className={`h-4 w-4 ${
+                    table.warningColor || "text-amber-500"
+                  }`}
+                />
               )}
               <span className="font-semibold text-white">{table.name}</span>
             </div>
@@ -171,14 +175,14 @@ function ChatPanel({ tableId }: { tableId: string | null }) {
 
   if (!tableId) {
     return (
-      <div className="flex min-h-[360px] h-full items-center justify-center rounded-xl bg-slate-50">
+      <div className="flex h-full items-center justify-center rounded-xl bg-slate-50">
         <EmptyState />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-[520px] h-full flex-col overflow-hidden rounded-xl bg-slate-50">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl bg-slate-50">
       {/* Header */}
       <div className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -197,7 +201,7 @@ function ChatPanel({ tableId }: { tableId: string | null }) {
       </div>
 
       {/* Chat Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 overflow-y-auto p-4 min-h-0">
         <div className="space-y-4">
           {mockMessages.map((msg) => (
             <div
@@ -281,7 +285,7 @@ function DetailsPanel({
 
   if (!tableId) {
     return (
-      <div className="flex min-h-[320px] h-full items-center justify-center rounded-xl bg-slate-50">
+      <div className="flex h-full items-center justify-center rounded-xl bg-slate-50">
         <EmptyState />
       </div>
     );
@@ -433,7 +437,7 @@ export default function StaffDashboardPage() {
   }, [fetchDashboardData]);
 
   return (
-    <div className="flex min-h-[calc(100dvh-73px)] flex-col bg-slate-100 xl:flex-row">
+    <div className="flex h-[calc(100dvh-73px)] flex-col bg-slate-100 xl:flex-row overflow-hidden">
       {/* Sidebar - Dark Navy */}
       <div className="flex max-h-[420px] w-full flex-col bg-[#13275a] xl:max-h-none xl:w-[360px]">
         <div className="p-5">
@@ -458,12 +462,12 @@ export default function StaffDashboardPage() {
       {/* Main Content */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Chat Panel */}
-        <div className="min-w-0 flex-1 overflow-hidden p-3 sm:p-4">
+        <div className="min-w-0 flex-1 h-full overflow-hidden p-3 sm:p-4">
           <ChatPanel tableId={selectedTableId} />
         </div>
 
         {/* Details Panel */}
-        <div className="w-full overflow-hidden p-3 pt-0 sm:p-4 sm:pt-0 lg:w-[340px] lg:pt-4">
+        <div className="w-full h-full overflow-hidden p-3 pt-0 sm:p-4 sm:pt-0 lg:w-[340px] lg:pt-4">
           <DetailsPanel
             tableId={selectedTableId}
             onDataChange={fetchDashboardData}
