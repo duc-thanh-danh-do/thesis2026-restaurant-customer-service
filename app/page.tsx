@@ -2,14 +2,36 @@ import Link from 'next/link';
 import { ChevronRight, QrCode, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { prisma } from '@/lib/prisma';
 
-const customerEntryPoints = [
-  { table: 'Table 4', path: '/table/table-4/menu' },
-  { table: 'Table 7', path: '/table/table-7/menu' },
-  { table: 'Table 12', path: '/table/table-12/menu' },
-];
+export const dynamic = 'force-dynamic';
 
-export default function Home() {
+async function getCustomerEntryPoints() {
+  const tables = await prisma.restaurantTable.findMany({
+    where: {
+      restaurantId: 1,
+      isActive: true,
+    },
+    orderBy: {
+      tableNumber: 'asc',
+    },
+    select: {
+      id: true,
+      tableNumber: true,
+      qrCodeToken: true,
+    },
+  });
+
+  return tables.map((table) => ({
+    id: table.id,
+    table: `Table ${table.tableNumber}`,
+    path: `/table/${table.qrCodeToken}/menu`,
+  }));
+}
+
+export default async function Home() {
+  const customerEntryPoints = await getCustomerEntryPoints();
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col px-4 py-8 sm:px-6 lg:justify-center">
@@ -36,7 +58,7 @@ export default function Home() {
 
             <div className="space-y-3">
               {customerEntryPoints.map((item) => (
-                <Link key={item.table} href={item.path}>
+                <Link key={item.id} href={item.path}>
                   <Card className="bg-card border-border hover:border-accent transition-colors cursor-pointer">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
