@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { updateRequestStatus } from "@/actions/customer-request.action";
 import { cn } from "@/lib/utils";
 import { badgeVariants } from "@/components/ui/badge";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface RequestCardProps {
   id: string | number;
@@ -45,11 +46,15 @@ export default function RequestCard({
     <div className="bg-white rounded-xl border border-slate-200 p-4">
       <div className="flex items-center justify-between mb-2">
         <span className="font-medium text-slate-700">{text}</span>
-        <span className="text-xs text-slate-400">{time}</span>
+        <span className="text-xs text-slate-400">
+          {formatRelativeTime(time)}
+        </span>
       </div>
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-2 mt-3">
         {STATUSES.map((status) => {
           const isActive = status === optimisticStatus;
+          const isWaiting = status === "Waiting";
+
           return (
             <button
               key={status}
@@ -59,6 +64,11 @@ export default function RequestCard({
                 badgeVariants({ variant: isActive ? "default" : "secondary" }),
                 "cursor-pointer transition-colors duration-200",
                 !isActive && "text-slate-500 hover:bg-slate-200",
+
+                isWaiting &&
+                  isActive &&
+                  "bg-red-500 hover:bg-red-600 text-white",
+
                 isPending && "opacity-50 cursor-not-allowed"
               )}
             >
