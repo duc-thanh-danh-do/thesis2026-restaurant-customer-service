@@ -47,10 +47,16 @@ export default function StaffWorkSpace() {
         if (order.status === "Placed") {
           hasWarning = true;
           badges.push({ text: "Order: Placed", color: "bg-amber-500" });
-        } else if (order.status === "Preparing")
-          badges.push({ text: "Order: Preparing", color: "bg-slate-500" });
-        else if (order.status === "Ready")
-          badges.push({ text: "Order: Ready", color: "bg-blue-500" });
+          if (order.createdAt) {
+            const tTime = new Date(order.createdAt).getTime();
+            if (tTime < oldestPendingTime) oldestPendingTime = tTime;
+          }
+        } else {
+          badges.push({
+            text: `Order: ${order.status}`,
+            color: "bg-slate-500",
+          });
+        }
       });
 
       tableRequests.forEach((req: any) => {
@@ -69,7 +75,7 @@ export default function StaffWorkSpace() {
           if (req.createdAt) {
             const tTime = new Date(req.createdAt).getTime();
             if (tTime < oldestPendingTime) oldestPendingTime = tTime;
-         }
+          }
         } else if (req.status === "In progress")
           badges.push({ text: "Req: In Progress", color: "bg-slate-500" });
       });
@@ -86,7 +92,7 @@ export default function StaffWorkSpace() {
     });
 
     formattedTables.sort((a, b) => {
-      return a.sortTime - b.sortTime; 
+      return a.sortTime - b.sortTime;
     });
 
     setActiveTables(formattedTables);
