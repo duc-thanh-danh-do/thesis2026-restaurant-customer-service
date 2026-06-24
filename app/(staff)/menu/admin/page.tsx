@@ -3,25 +3,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import MenuAdminHeader from "@/components/menu/MenuManagementHeader";
 import AddDishDrawer from "@/components/menu/AddDishDrawer";
+import { MenuItem } from "@/components/menu/MenuItemForm";
 import {
   getMenuItemsAction,
   deleteMenuItemAction,
   toggleMenuItemAvailabilityAction,
 } from "@/actions/menu-item.action";
-
-interface MenuItem {
-  id: number;
-  name: string;
-  category: string | null;
-  price: number;
-  isAvailable: boolean;
-  dietary?: string | null;
-  description?: string | null;
-  imageUrl?: string | null;
-}
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import MenuCategoryGroup from "@/components/menu/MenuCategoryGroup";
 
 // Main page
 export default function MenuAdminPage() {
@@ -42,7 +33,7 @@ export default function MenuAdminPage() {
     const data = await getMenuItemsAction();
     setMenuItems(data);
     setIsLoading(false);
-  },[]);
+  }, []);
 
   useEffect(() => {
     fetchItems();
@@ -125,92 +116,19 @@ export default function MenuAdminPage() {
 
           {/* Dish List */}
           <div className="space-y-6">
-            {categoryOrder.map((category) => {
-              const items = menuItemsByCategory[category] || [];
-              if (items.length === 0) return null;
-
-              return (
-                <div key={category} className="space-y-3">
-                  <div className="text-sm font-medium text-[#142653] uppercase tracking-wide">
-                    {category}
-                  </div>
-                  <div className="space-y-2">
-                    {items.map((item) => (
-                      <Card
-                        key={item.id}
-                        className={`p-4 bg-white border border-[#d5e1ec] rounded-[20px] transition-opacity duration-200 ${
-                          !item.isAvailable ? "opacity-50 grayscale-[50%]" : ""
-                        }`}
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                              <div className="w-6 h-6 bg-gray-300 rounded"></div>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-medium text-[#142653] flex items-center">
-                                <span className="truncate">{item.name}</span>
-                                {!item.isAvailable && (
-                                  <span className="ml-2 text-[10px] font-bold text-red-500 border border-red-200 bg-red-50 px-2 py-0.5 rounded-full shrink-0">
-                                    Hidden
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-600 truncate">
-                                €{item.price.toFixed(2)}
-                                {item.dietary && ` · ${item.dietary.toLowerCase()}`}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-full px-3 py-1 text-sm h-8"
-                              onClick={() => {
-                                setEditingItem(item);
-                                setIsDrawerOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-3 w-3 sm:mr-1" />
-                              <span className="hidden sm:inline">Edit</span>
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() =>
-                                handleToggleAvailability(
-                                  item.id,
-                                  item.isAvailable
-                                )
-                              }
-                            >
-                              {item.isAvailable ? (
-                                <Eye className="h-4 w-4 text-gray-500" />
-                              ) : (
-                                <EyeOff className="h-4 w-4 text-slate-400" />
-                              )}
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-red-50"
-                              onClick={() => triggerDelete(item.id, item.name)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+            {categoryOrder.map((category) => (
+              <MenuCategoryGroup
+                key={category}
+                category={category}
+                items={menuItemsByCategory[category]}
+                onEdit={(editItem) => {
+                  setEditingItem(editItem);
+                  setIsDrawerOpen(true);
+                }}
+                onToggleAvailability={handleToggleAvailability}
+                onDelete={triggerDelete}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -224,56 +142,10 @@ export default function MenuAdminPage() {
       <DeleteConfirmModal
         isOpen={deleteModal.isOpen}
         name={deleteModal.name}
+        title="Delete Dish"
         onCancel={() => setDeleteModal({ isOpen: false, id: 0, name: "" })}
         onConfirm={confirmDelete}
       />
-    </div>
-  );
-}
-
-// Delete Alert Popup
-function DeleteConfirmModal({
-  isOpen,
-  name,
-  onCancel,
-  onConfirm,
-}: {
-  isOpen: boolean;
-  name: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm px-4">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all">
-        <div className="flex items-center gap-3 mb-4">
-          <h3 className="text-lg font-bold text-slate-800">Delete Dish</h3>
-        </div>
-
-        <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-          Are you sure you want to delete{" "}
-          <span className="font-bold text-slate-800">&quot;{name}&quot;</span>?
-          This action cannot be undone.
-        </p>
-
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={onCancel}
-            className="text-slate-600"
-          >
-            Cancel
-          </Button>
-          <Button
-            className="bg-red-500 hover:bg-red-600 text-white shadow-sm"
-            onClick={onConfirm}
-          >
-            Delete
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

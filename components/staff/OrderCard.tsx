@@ -54,7 +54,7 @@ export default function OrderCard({
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
         <div className="flex items-center justify-between">
           <span className="font-medium text-slate-700">
-            {id} · {time}
+            {time}
           </span>
           <span className="font-semibold text-slate-800">
             €{optimisticTotal.toFixed(2)}
@@ -65,8 +65,8 @@ export default function OrderCard({
       {/* Progress Section */}
       <div className="px-4 py-4 border-b border-slate-100">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-medium text-slate-400 uppercase">
-            Progress
+          <span className="text-xs font-medium text-slate-400">
+            PROGRESS
           </span>
           <span className="text-sm font-medium text-slate-700">
             {optimisticStatus}

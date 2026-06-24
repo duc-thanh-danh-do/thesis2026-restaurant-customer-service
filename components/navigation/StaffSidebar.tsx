@@ -13,7 +13,7 @@ const links = [
 
 export default function StaffSidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-[#0f2147] p-5 text-white lg:block">
+    <aside className="hidden w-48 shrink-0 border-r border-slate-200 bg-[#0f2147] p-5 text-white lg:block">
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase text-slate-300">Staff Dashboard</p>
         <h1 className="mt-1 text-xl font-bold">TestPizza</h1>
