@@ -2,7 +2,6 @@
 .env.*
 !.env.example
 .next/
-.claude/
 node_modules/
 dist/
 coverage/
