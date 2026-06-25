@@ -60,8 +60,6 @@ async function upsertMenuItem(restaurantId: number, item: MenuItemSeed) {
     price: new Prisma.Decimal(item.price),
     ingredients: item.ingredients,
     isAvailable: item.isAvailable,
-    // isVegetarian: item.isVegetarian,
-    // isVegan: item.isVegan,
     dietary: item.dietary,
   };
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { revalidatePath } from "next/cache";
 
 // Get requests
@@ -26,6 +27,8 @@ export async function getActiveRequestsAction() {
 
     return requests;
   } catch (error) {
+    if (isDatabaseUnavailable(error)) return [];
+
     console.error("Failed to get request:", error);
     return [];
   }
@@ -51,6 +54,13 @@ export async function updateRequestStatus(
 
     return { success: true, data: updatedRequest };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return {
+        success: false,
+        error: "Database is unavailable. Please try again later.",
+      };
+    }
+
     console.error("Failed to update request status:", error);
     return {
       success: false,
@@ -79,6 +89,8 @@ export async function getTableRequestsAction(tableNumber: string) {
 
     return requests;
   } catch (error) {
+    if (isDatabaseUnavailable(error)) return [];
+
     console.error(`Failed to get the request of ${tableNumber}:`, error);
     return [];
   }

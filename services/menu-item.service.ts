@@ -23,8 +23,6 @@ export async function getMenuItems(
         ingredients: item.ingredients,
         imageUrl: item.imageUrl,
         isAvailable: item.isAvailable,
-        // isVegetarian: item.isVegetarian,
-        // isVegan: item.isVegan,
         dietary: item.dietary,
         allergens: item.menuItemAllergens.map(({ allergen }) => ({
           id: allergen.id,
@@ -53,8 +51,6 @@ export async function getMenuItems(
           if (!item.dietary || !item.dietary.includes(filters.dietary)) {
             return false;
           }
-        } {
-          return false;
         }
         return true;
       }),

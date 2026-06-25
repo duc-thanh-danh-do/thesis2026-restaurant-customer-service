@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { revalidatePath } from "next/cache";
 
 type OrderItemRow = {
@@ -22,6 +23,10 @@ export async function updateOrderStatus(orderId: number, status: string) {
 
     return { success: true };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error(" Failed to update order status:", error);
     return { success: false, error: "Database update failed" };
   }
@@ -131,6 +136,10 @@ export async function updateItemQuantityAction(
     revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error("Failed to update quantity:", error);
     return { success: false, error: "Failed to update item" };
   }

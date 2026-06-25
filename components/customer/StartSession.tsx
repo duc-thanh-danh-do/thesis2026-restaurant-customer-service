@@ -23,7 +23,7 @@ export default function StartSession({ qrToken }: { qrToken: string }) {
 
         const payload = (await response.json()) as { sessionToken: string };
         window.localStorage.setItem("dining-session-token", payload.sessionToken);
-        router.replace(`/session/${payload.sessionToken}`);
+        router.replace(`/table/${qrToken}/menu`);
       } catch (sessionError) {
         setError(
           sessionError instanceof Error

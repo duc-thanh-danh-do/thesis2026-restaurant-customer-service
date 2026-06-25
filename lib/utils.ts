@@ -7,10 +7,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatRelativeTime(dateString: string | Date | undefined): string {
   if (!dateString) return "Just now";
-  
+
   const date = new Date(dateString);
   const now = new Date();
-  
+
   if (isNaN(date.getTime())) return "Just now";
 
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);

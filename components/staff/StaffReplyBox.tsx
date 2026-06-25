@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,28 +15,27 @@ export default function StaffReplyBox({ onSendMessage }: StaffReplyBoxProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
-    
-    if (onSendMessage) {
-      onSendMessage(message);
-    }
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
+
+    onSendMessage?.(trimmedMessage);
     setMessage("");
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white px-4 py-3 border-t border-slate-100 flex-shrink-0 flex gap-2">
+    <form className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-3" onSubmit={handleSubmit}>
       <Input
+        className="border-slate-200 bg-slate-50"
+        onChange={(e) => setMessage(e.target.value)}
         placeholder="Reply to the guest..."
         value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        className="bg-slate-50 border-slate-200"
       />
-      <Button 
-        size="icon" 
+      <Button
+        className="bg-[#142653] text-white hover:bg-[#1d3670]"
+        size="icon"
         type="submit"
-        className="bg-slate-200 hover:bg-slate-300 text-slate-600"
       >
-        <ChevronRight className="h-5 w-5" />
+        <ChevronRight className="h-5 w-5" aria-hidden="true" />
       </Button>
     </form>
   );
