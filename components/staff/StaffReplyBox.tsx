@@ -1,10 +1,42 @@
-export default function StaffReplyBox() {
+"use client";
+
+import type React from "react";
+import { useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+interface StaffReplyBoxProps {
+  onSendMessage?: (text: string) => void;
+}
+
+export default function StaffReplyBox({ onSendMessage }: StaffReplyBoxProps) {
+  const [message, setMessage] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
+
+    onSendMessage?.(trimmedMessage);
+    setMessage("");
+  };
+
   return (
-    <form className="flex gap-2">
-      <input className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:bg-white" placeholder="Reply to the guest..." />
-      <button className="rounded-lg bg-[#142653] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d3670]" type="button">
-        Send
-      </button>
+    <form className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-3" onSubmit={handleSubmit}>
+      <Input
+        className="border-slate-200 bg-slate-50"
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Reply to the guest..."
+        value={message}
+      />
+      <Button
+        className="bg-[#142653] text-white hover:bg-[#1d3670]"
+        size="icon"
+        type="submit"
+      >
+        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+      </Button>
     </form>
   );
 }

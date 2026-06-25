@@ -7,6 +7,7 @@ import {
   fallbackRestaurant,
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
+import { logger } from "@/lib/logger";
 import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
 import { generateAiText } from "@/services/ai-assistant.service";
@@ -41,7 +42,12 @@ export async function sendCustomerChatMessage(
 
     const groundedContext = buildGroundedContext(restaurant);
     const prompt = buildGeminiPrompt(groundedContext, message);
-    const reply = normalizeReply(await generateAiText(prompt));
+    const reply = await generateReplyWithFallback({
+      restaurant,
+      groundedContext,
+      message,
+      prompt,
+    });
     const handoverRequired = requiresStaffHandover(message);
 
     const aiMessage = await createChatMessage(session.id, "ai", reply);
@@ -158,14 +164,16 @@ function buildGroundedContext(restaurant: RestaurantContext) {
 
 function buildGeminiPrompt(groundedContext: string, customerMessage: string) {
   return [
-    "You are a restaurant customer-service assistant.",
-    "Answer concisely and helpfully using only the restaurant data provided below.",
-    "Do not invent menu items, prices, allergens, availability, ingredients, or policies.",
-    "If the answer is not available in the provided data, say that the information is not available.",
-    "For allergy questions, do not guarantee safety; recommend confirmation with restaurant staff.",
-    "If the customer asks for payment, staff help, complaint handling, or sensitive allergy confirmation, politely say staff may need to assist.",
+    "You are a friendly restaurant waiter helping a customer at their table.",
+    "Use only the grounded restaurant context from the database below.",
+    "The context includes restaurant information, menu items, allergens for each menu item, and active restaurant knowledge base records.",
+    "Answer simply, naturally, and briefly.",
+    "Do not invent menu items, prices, allergens, availability, ingredients, opening hours, or policies.",
+    "If the database context does not contain the answer, say that you do not have that information and offer to ask staff.",
+    "For allergy questions, summarize listed allergens but do not guarantee safety; recommend confirming with restaurant staff.",
+    "For payment, complaints, staff help, or sensitive allergy confirmation, explain that staff should assist.",
     "",
-    "Provided restaurant data:",
+    "Grounded restaurant context:",
     groundedContext,
     "",
     `Customer message: ${customerMessage}`,
@@ -213,13 +221,86 @@ function buildFallbackGroundedContext() {
   ].join("\n");
 }
 
+async function generateReplyWithFallback({
+  restaurant,
+  groundedContext,
+  message,
+  prompt,
+}: {
+  restaurant: RestaurantContext;
+  groundedContext: string;
+  message: string;
+  prompt: string;
+}) {
+  try {
+    return normalizeReply(await generateAiText(prompt));
+  } catch (error) {
+    logger.error("Gemini failed for customer chat message", error);
+    return buildDatabaseFallbackReply(restaurant, message, groundedContext);
+  }
+}
+
+function buildDatabaseFallbackReply(
+  restaurant: RestaurantContext,
+  message: string,
+  groundedContext: string,
+) {
+  const matchedItem = findMentionedMenuItem(restaurant, message);
+
+  if (matchedItem) {
+    const allergens = getAllergenNames(matchedItem);
+    const hasAllergyConcern = /allerg|fish|gluten|soy|milk|dairy|egg|nut|peanut|shellfish|sesame/i.test(
+      message,
+    );
+
+    if (hasAllergyConcern) {
+      return [
+        `I could not reach Gemini right now, but from the restaurant database: ${matchedItem.name} lists ${formatAllergenList(allergens)} as allergens.`,
+        "Please confirm with restaurant staff before ordering, especially for allergies.",
+      ].join(" ");
+    }
+
+    return [
+      `I could not reach Gemini right now, but from the restaurant database: ${matchedItem.name} is ${matchedItem.isAvailable ? "available" : "not available"}.`,
+      `Allergens listed: ${formatAllergenList(allergens)}.`,
+    ].join(" ");
+  }
+
+  if (groundedContext.trim()) {
+    return "I could not reach Gemini right now, but I can still use the restaurant database. Please ask again with the dish name, or ask restaurant staff for help.";
+  }
+
+  return "I could not reach Gemini right now. Please ask restaurant staff for help.";
+}
+
+function findMentionedMenuItem(restaurant: RestaurantContext, message: string) {
+  const normalizedMessage = normalizeSearchText(message);
+
+  return restaurant.menuItems.find((item) => {
+    const normalizedName = normalizeSearchText(item.name);
+    return normalizedMessage.includes(normalizedName);
+  });
+}
+
+function getAllergenNames(item: RestaurantContext["menuItems"][number]) {
+  return item.menuItemAllergens.map(({ allergen }) => allergen.name);
+}
+
+function formatAllergenList(allergens: string[]) {
+  return allergens.length > 0 ? allergens.join(", ") : "none";
+}
+
+function normalizeSearchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 function normalizeReply(reply: string) {
   const trimmedReply = reply.trim();
   return trimmedReply || "I do not have enough information in the provided restaurant data to answer that.";
 }
 
 function requiresStaffHandover(message: string) {
-  return /\b(allerg|bill|pay|payment|complaint|manager|staff|help)\b/i.test(
+  return /\b(allerg\w*|bill|pay|payment|complaint|manager|staff|help)\b/i.test(
     message,
   );
 }

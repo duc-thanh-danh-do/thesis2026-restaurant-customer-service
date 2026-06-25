@@ -1,20 +1,124 @@
-import { Bot, CheckCircle2, CircleDollarSign, Send, UserRound } from "lucide-react";
-import type { StaffSessionDetail } from "@/lib/staff-page-data";
-import StaffReplyBox from "@/components/staff/StaffReplyBox";
+"use client";
 
-function timeLabel(value: Date | null) {
+import { Bot, CheckCircle2, CircleDollarSign, Send, UserRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import StaffReplyBox from "@/components/staff/StaffReplyBox";
+import type { StaffSessionDetail } from "@/lib/staff-page-data";
+
+const mockMessages = [
+  {
+    id: 1,
+    sender: "assistant",
+    text: "Welcome to Bistro Aurora, table 4. How can I help you today?",
+    time: "23 min ago",
+    avatar: "AI",
+  },
+  {
+    id: 2,
+    sender: "user",
+    text: "Which dishes are vegetarian and do not contain sesame?",
+    time: "22 min ago",
+    avatar: "TR",
+  },
+  {
+    id: 3,
+    sender: "assistant",
+    text: "Three dishes match: Wild Mushroom Risotto, Roasted Beet Salad, and Tomato Orecchiette. None contain sesame.",
+    time: "21 min ago",
+    avatar: "AI",
+  },
+  {
+    id: 4,
+    sender: "user",
+    text: "Can I have the bill, please?",
+    time: "3 min ago",
+    avatar: "TR",
+  },
+  {
+    id: 5,
+    sender: "assistant",
+    text: "Your request has been sent to the staff.",
+    time: "3 min ago",
+    avatar: "AI",
+  },
+];
+
+type StaffConversationPanelProps =
+  | { session: StaffSessionDetail; tableId?: never }
+  | { tableId: string | null; session?: never };
+
+function timeLabel(value: Date | string | null) {
   if (!value) return "unknown time";
   return new Intl.DateTimeFormat("en", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(value);
+  }).format(new Date(value));
 }
 
 function isGuest(senderType: string) {
   return /customer|guest|user/i.test(senderType);
 }
 
-export default function StaffConversationPanel({ session }: { session: StaffSessionDetail }) {
+export default function StaffConversationPanel(props: StaffConversationPanelProps) {
+  if (props.session) {
+    return <SessionConversationPanel session={props.session} />;
+  }
+
+  return <DashboardConversationPanel tableId={props.tableId} />;
+}
+
+function DashboardConversationPanel({ tableId }: { tableId: string | null }) {
+  const handleSendMessage = (text: string) => {
+    console.log(`Sending message to table ${tableId}: ${text}`);
+  };
+
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-white">
+      <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-slate-800">Table {tableId}</h2>
+          </div>
+          <Button className="w-full bg-green-500 text-white hover:bg-green-600 sm:w-auto">
+            Mark all resolved
+          </Button>
+        </div>
+      </div>
+
+      <ScrollArea className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="space-y-4">
+          {mockMessages.map((msg) => (
+            <div
+              className={`flex gap-3 ${msg.sender === "user" ? "flex-row-reverse" : ""}`}
+              key={msg.id}
+            >
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium text-white ${
+                  msg.sender === "user" ? "bg-slate-700" : "bg-blue-400"
+                }`}
+              >
+                {msg.avatar}
+              </div>
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[70%] ${
+                  msg.sender === "user" ? "bg-slate-700 text-white" : "border border-slate-200 bg-white"
+                }`}
+              >
+                <p className="text-sm">{msg.text}</p>
+                <p className="mt-1 text-xs text-slate-400">{msg.time}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+
+      <StaffReplyBox onSendMessage={handleSendMessage} />
+    </div>
+  );
+}
+
+function SessionConversationPanel({ session }: { session: StaffSessionDetail }) {
   return (
     <div className="grid min-h-[calc(100vh-12rem)] overflow-hidden rounded-lg border border-slate-200 bg-white lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="flex min-h-0 flex-col">
@@ -23,7 +127,7 @@ export default function StaffConversationPanel({ session }: { session: StaffSess
           <div className="mt-1 flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-slate-950">Table {session.tableNumber}</h2>
-              <p className="text-sm text-slate-500">Session #{session.id} · {session.status.replaceAll("_", " ")}</p>
+              <p className="text-sm text-slate-500">Session #{session.id} - {session.status.replaceAll("_", " ")}</p>
             </div>
             <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
               {session.handoverCount > 0 ? "Needs staff" : "AI handling"}
@@ -49,13 +153,11 @@ export default function StaffConversationPanel({ session }: { session: StaffSess
                   ) : null}
                   <div className={`max-w-[min(560px,80%)] ${guest ? "text-right" : ""}`}>
                     <p className="mb-1 text-xs text-slate-500">
-                      {guest ? "Guest" : "Assistant"} · {timeLabel(message.createdAt)}
+                      {guest ? "Guest" : "Assistant"} - {timeLabel(message.createdAt)}
                     </p>
                     <div
                       className={`rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
-                        guest
-                          ? "bg-[#142653] text-white"
-                          : "border border-slate-200 bg-white text-slate-900"
+                        guest ? "bg-[#142653] text-white" : "border border-slate-200 bg-white text-slate-900"
                       }`}
                     >
                       {message.messageContent}
@@ -72,9 +174,7 @@ export default function StaffConversationPanel({ session }: { session: StaffSess
           )}
         </div>
 
-        <div className="border-t border-slate-200 bg-white px-5 py-4">
-          <StaffReplyBox />
-        </div>
+        <StaffReplyBox />
       </section>
 
       <aside className="border-t border-slate-200 bg-[#f2f7fb] p-5 lg:border-l lg:border-t-0">
@@ -90,14 +190,14 @@ export default function StaffConversationPanel({ session }: { session: StaffSess
               <section className="rounded-lg bg-white p-4 ring-1 ring-slate-200" key={order.id}>
                 <div className="flex items-center justify-between">
                   <p className="font-semibold text-slate-950">#{order.id}</p>
-                  <p className="font-semibold text-slate-950">€{order.total.toFixed(2)}</p>
+                  <p className="font-semibold text-slate-950">EUR {order.total.toFixed(2)}</p>
                 </div>
                 <p className="mt-1 text-xs font-semibold uppercase text-blue-600">{order.status}</p>
                 <div className="mt-3 space-y-2 text-sm text-slate-700">
                   {order.items.map((item) => (
                     <div className="flex justify-between gap-3" key={item.id}>
-                      <span>{item.quantity}× {item.name}</span>
-                      <span>€{(item.price * item.quantity).toFixed(2)}</span>
+                      <span>{item.quantity}x {item.name}</span>
+                      <span>EUR {(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
