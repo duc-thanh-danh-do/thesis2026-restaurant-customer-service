@@ -11,6 +11,7 @@ interface CreateMenuItemInput {
   description: string;
   dietary?: string;
   ingredients: string;
+  imageUrl?: string | null;
 }
 
 type DecimalLike = number | string | { toString(): string };
@@ -52,6 +53,7 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
         description: data.description,
         ingredients: data.ingredients,
         dietary: data.dietary,
+        imageUrl: data.imageUrl,
         isAvailable: true,
       },
     });
@@ -64,7 +66,10 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
     };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return { success: false, error: "Database is unavailable. Please try again later." };
+      return {
+        success: false,
+        error: "Database is unavailable. Please try again later.",
+      };
     }
 
     console.error("Failed to add menu:", error);
@@ -103,7 +108,10 @@ export async function deleteMenuItemAction(id: number) {
     return { success: true };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return { success: false, error: "Database is unavailable. Please try again later." };
+      return {
+        success: false,
+        error: "Database is unavailable. Please try again later.",
+      };
     }
 
     console.error("Failed to delete dish:", error);
@@ -126,7 +134,10 @@ export async function toggleMenuItemAvailabilityAction(
     return { success: true };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return { success: false, error: "Database is unavailable. Please try again later." };
+      return {
+        success: false,
+        error: "Database is unavailable. Please try again later.",
+      };
     }
 
     console.error("Failed to change the availability:", error);
@@ -135,7 +146,6 @@ export async function toggleMenuItemAvailabilityAction(
 }
 
 // Edit MenuItem
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function editMenuItemAction(id: number, data: any) {
   try {
     const editItem = await prisma.menuItem.update({
@@ -147,6 +157,7 @@ export async function editMenuItemAction(id: number, data: any) {
         category: data.category,
         dietary: data.dietary,
         ingredients: data.ingredients,
+        imageUrl: data.imageUrl,
       },
     });
 
@@ -154,7 +165,10 @@ export async function editMenuItemAction(id: number, data: any) {
     return { success: true, data: serializeMenuItem(editItem) };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return { success: false, error: "Database is unavailable. Please try again later." };
+      return {
+        success: false,
+        error: "Database is unavailable. Please try again later.",
+      };
     }
 
     console.error("Failed to update dish:", error);
