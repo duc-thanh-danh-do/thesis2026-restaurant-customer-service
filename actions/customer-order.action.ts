@@ -27,31 +27,31 @@ export async function updateOrderStatus(orderId: number, status: string) {
   }
 }
 
-export async function getTestOrder() {
-  try {
-    const order = await prisma.order.findFirst({
-      include: { orderItems: true },
-    });
+// export async function getTestOrder() {
+//   try {
+//     const order = await prisma.order.findFirst({
+//       include: { orderItems: true },
+//     });
 
-    if (!order) return null;
+//     if (!order) return null;
 
-    return {
-      id: order.id.toString(),
-      time: "Just now",
-      total: Number(order.total),
-      status: order.status,
-      items: order.orderItems.map((item: OrderItemRow) => ({
-        id: item.id,
-        name: item.name,
-        price: Number(item.price),
-        quantity: item.quantity,
-      })),
-    };
-  } catch (error) {
-    console.error("Failed to fetch test order:", error);
-    return null;
-  }
-}
+//     return {
+//       id: order.id.toString(),
+//       time: "Just now",
+//       total: Number(order.total),
+//       status: order.status,
+//       items: order.orderItems.map((item: OrderItemRow) => ({
+//         id: item.id,
+//         name: item.name,
+//         price: Number(item.price),
+//         quantity: item.quantity,
+//       })),
+//     };
+//   } catch (error) {
+//     console.error("Failed to fetch test order:", error);
+//     return null;
+//   }
+// }
 
 export async function getTableOrderAction(tableNumber: string) {
   try {
