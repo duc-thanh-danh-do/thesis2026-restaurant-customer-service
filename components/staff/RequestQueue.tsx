@@ -5,17 +5,35 @@ import { getActiveRequestsAction } from "@/actions/customer-request.action";
 import RequestCard from "@/components/staff/RequestCard";
 import { CheckCircle2, Clock } from "lucide-react";
 
+type RequestQueueItem = {
+  id: number;
+  requestType: string;
+  status: string;
+  createdAt: Date | string | null;
+  session?: {
+    table?: {
+      tableNumber?: string | null;
+    } | null;
+  } | null;
+};
+
+type RequestGroup = {
+  tableName: string;
+  requests: RequestQueueItem[];
+  oldestTime: number;
+};
+
 export default function RequestsPage() {
-  const [groupedRequests, setGroupedRequests] = useState<any[]>([]);
+  const [groupedRequests, setGroupedRequests] = useState<RequestGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalPending, setTotalPending] = useState(0);
 
   const fetchRequests = useCallback(async () => {
-    const rawRequests = await getActiveRequestsAction();
+    const rawRequests = await getActiveRequestsAction() as RequestQueueItem[];
     setTotalPending(rawRequests.length);
 
-    const groups: Record<string, any[]> = {};
-    rawRequests.forEach((req: any) => {
+    const groups: Record<string, RequestQueueItem[]> = {};
+    rawRequests.forEach((req) => {
       const tableNum = req.session?.table?.tableNumber || "Unknown";
       if (!groups[tableNum]) {
         groups[tableNum] = [];
@@ -25,7 +43,7 @@ export default function RequestsPage() {
 
     const groupedArray = Object.keys(groups).map((tableNum) => {
       const reqs = groups[tableNum];
-      reqs.sort((a: any, b: any) => {
+      reqs.sort((a, b) => {
         const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return timeA - timeB;
@@ -47,6 +65,7 @@ export default function RequestsPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRequests();
     const interval = setInterval(() => {
       fetchRequests();
@@ -109,7 +128,7 @@ export default function RequestsPage() {
 
                     {/* Requests */}
                     <div className="flex-1 flex flex-col gap-3">
-                      {group.requests.map((req: any) => {
+                      {group.requests.map((req) => {
                         const timeStr = req.createdAt
                           ? new Date(req.createdAt).toLocaleTimeString([], {
                               hour: "2-digit",

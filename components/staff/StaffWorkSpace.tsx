@@ -1,10 +1,8 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useCallback } from "react";
-import ActiveTableCard from "@/components/staff/ActiveTableCard";
+import ActiveTableCard, { type ActiveTableBadge, type ActiveTableSummary } from "@/components/staff/ActiveTableCard";
 import StaffConversationPanel from "@/components/staff/StaffConversationPanel";
-import TableDetailPage from "@/app/(staff)/tables/[tableId]/page";
 
 import { getActiveOrdersAction } from "@/actions/customer-order.action";
 import { getActiveRequestsAction } from "@/actions/customer-request.action";
@@ -12,9 +10,34 @@ import { getAllTablesAction } from "@/actions/restaurant-table.action";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TableDetailsPanel from "./TableDetailsPanel";
 
+type DashboardTable = {
+  tableNumber: string;
+};
+
+type DashboardOrder = {
+  status: string;
+  createdAt: Date | string | null;
+  session?: {
+    table?: {
+      tableNumber?: string | null;
+    } | null;
+  } | null;
+};
+
+type DashboardRequest = {
+  requestType: string;
+  status: string;
+  createdAt: Date | string | null;
+  session?: {
+    table?: {
+      tableNumber?: string | null;
+    } | null;
+  } | null;
+};
+
 export default function StaffWorkSpace() {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [activeTables, setActiveTables] = useState<any[]>([]);
+  const [activeTables, setActiveTables] = useState<ActiveTableSummary[]>([]);
 
   const fetchDashboardData = useCallback(async () => {
     const [rawTables, rawOrders, rawRequests] = await Promise.all([
@@ -23,22 +46,26 @@ export default function StaffWorkSpace() {
       getActiveRequestsAction(),
     ]);
 
-    const formattedTables = rawTables.map((t: any) => {
-      const tableOrders = rawOrders.filter(
-        (o: any) => o.session?.table?.tableNumber === t.tableNumber
+    const tables = rawTables as DashboardTable[];
+    const orders = rawOrders as DashboardOrder[];
+    const requests = rawRequests as DashboardRequest[];
+
+    const formattedTables = tables.map((t) => {
+      const tableOrders = orders.filter(
+        (o) => o.session?.table?.tableNumber === t.tableNumber
       );
-      const tableRequests = rawRequests.filter(
-        (req: any) => req.session?.table?.tableNumber === t.tableNumber
+      const tableRequests = requests.filter(
+        (req) => req.session?.table?.tableNumber === t.tableNumber
       );
 
       let hasWarning = false;
       let warningColor = "text-amber-500";
-      const badges: any[] = [];
+      const badges: ActiveTableBadge[] = [];
       let latestTime = "";
 
       let oldestPendingTime = Infinity;
 
-      tableOrders.forEach((order: any) => {
+      tableOrders.forEach((order) => {
         if (!latestTime && order.createdAt)
           latestTime = new Date(order.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
@@ -59,7 +86,7 @@ export default function StaffWorkSpace() {
         }
       });
 
-      tableRequests.forEach((req: any) => {
+      tableRequests.forEach((req) => {
         if (!latestTime && req.createdAt)
           latestTime = new Date(req.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
@@ -101,6 +128,7 @@ export default function StaffWorkSpace() {
   }, [selectedTableId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDashboardData();
   }, [fetchDashboardData]);
 
