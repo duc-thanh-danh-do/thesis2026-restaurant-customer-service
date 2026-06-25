@@ -10,6 +10,7 @@ interface CreateMenuItemInput {
   description: string;
   dietary?: string;
   ingredients: string;
+  imageUrl?: string | null;
 }
 
 type DecimalLike = number | string | { toString(): string };
@@ -22,7 +23,7 @@ type MenuItemRow = {
   category: string | null;
   price: DecimalLike;
   ingredients: string | null;
-  dietary: string | null
+  dietary: string | null;
   imageUrl: string | null;
   isAvailable: boolean;
   createdAt: Date | null;
@@ -43,7 +44,8 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
         price: data.price,
         description: data.description,
         ingredients: data.ingredients,
-        dietary: data.dietary, 
+        dietary: data.dietary,
+        imageUrl: data.imageUrl,
         isAvailable: true,
       },
     });
@@ -119,7 +121,6 @@ export async function toggleMenuItemAvailabilityAction(
 }
 
 // Edit MenuItem
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function editMenuItemAction(id: number, data: any) {
   try {
     const editItem = await prisma.menuItem.update({
@@ -130,17 +131,19 @@ export async function editMenuItemAction(id: number, data: any) {
         price: data.price,
         category: data.category,
         dietary: data.dietary,
-        // isVegetarian: data.isVegetarian,
-        // isVegan: data.isVegan,
         ingredients: data.ingredients,
+        imageUrl: data.imageUrl,
       },
     });
 
     revalidatePath("/menu/admin");
-    return { success: true, data: {
-      ...editItem,
-      price: Number(editItem.price), }
-    }
+    return {
+      success: true,
+      data: {
+        ...editItem,
+        price: Number(editItem.price),
+      },
+    };
   } catch (error) {
     console.error("Failed to update dish:", error);
     return { success: false, error: "Failed to update dish" };

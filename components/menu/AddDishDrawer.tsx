@@ -40,6 +40,7 @@ function useDishForm(
   const [category, setCategory] = useState("STARTERS");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
 
   const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
@@ -121,6 +122,7 @@ function useDishForm(
         description,
         dietary: selectedDietary.join(", "),
         ingredients: selectedIngredients.join(", "),
+        imageUrl,
       };
 
       let result;
@@ -138,7 +140,6 @@ function useDishForm(
     });
   };
 
-  // 🌟 把 UI 需要的数据全部打包返回
   return {
     formState: {
       name,
@@ -147,6 +148,7 @@ function useDishForm(
       description,
       selectedDietary,
       selectedIngredients,
+      imageUrl,
     },
     tags: { dietaryTags, ingredientTags },
     actions: {
@@ -157,6 +159,7 @@ function useDishForm(
       toggleDietary,
       toggleIngredient,
       handleSubmit,
+      setImageUrl,
     },
     isPending,
   };
@@ -212,7 +215,11 @@ export default function AddDishDrawer({
 
         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-5">
           {/* Image Upload */}
-          <ImageUploadBox disabled />
+          <ImageUploadBox
+            value={formState.imageUrl}
+            onChange={actions.setImageUrl}
+            disabled={isPending}
+          />
 
           {/* Name & Category */}
           <div className="grid grid-cols-2 gap-4">
