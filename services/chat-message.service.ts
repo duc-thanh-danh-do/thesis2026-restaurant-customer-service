@@ -191,6 +191,7 @@ function buildFallbackGroundedContext() {
         `  Category: ${item.category ?? "Not available"}`,
         `  Price: ${item.price.toFixed(2)}`,
         `  Available: ${item.isAvailable ? "yes" : "no"}`,
+        `  Dietary tags: ${item.dietary ?? "None"}`,
         `  Ingredients: ${item.ingredients ?? "Not available"}`,
         `  Allergens: ${allergens || "None listed"}`,
       ].join("\n");

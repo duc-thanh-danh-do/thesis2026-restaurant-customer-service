@@ -2,8 +2,24 @@
 
 import { AlertTriangle } from "lucide-react";
 
+export type ActiveTableBadge = {
+  text: string;
+  color: string;
+};
+
+export type ActiveTableSummary = {
+  id: string;
+  name: string;
+  time: string;
+  preview?: string;
+  hasWarning: boolean;
+  warningColor?: string;
+  badges: ActiveTableBadge[];
+  sortTime: number;
+};
+
 interface ActiveTableCardProps {
-  table: any;
+  table: ActiveTableSummary;
   isSelected: boolean;
   onClick: () => void;
 }
@@ -38,7 +54,7 @@ export default function ActiveTableCard({
       </p>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {table.badges.map((badge: any, i: number) => (
+        {table.badges.map((badge, i) => (
           <span
             key={i}
             className={`text-xs px-2 py-0.5 rounded-full text-white ${badge.color}`}

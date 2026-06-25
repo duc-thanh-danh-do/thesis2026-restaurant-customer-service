@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import MenuAdminHeader from "@/components/menu/MenuManagementHeader";
 import AddDishDrawer from "@/components/menu/AddDishDrawer";
@@ -36,6 +36,7 @@ export default function MenuAdminPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchItems();
   }, [fetchItems]);
 
