@@ -171,14 +171,20 @@ function collectErrorMessages(error: unknown, seen = new WeakSet<object>()): str
   seen.add(error);
 
   const source = error as {
+    code?: unknown;
     message?: unknown;
+    name?: unknown;
     originalMessage?: unknown;
+    meta?: unknown;
     cause?: unknown;
   };
 
   return [
+    typeof source.name === "string" ? source.name : "",
+    typeof source.code === "string" ? source.code : "",
     typeof source.message === "string" ? source.message : "",
     typeof source.originalMessage === "string" ? source.originalMessage : "",
+    collectErrorMessages(source.meta, seen),
     collectErrorMessages(source.cause, seen),
   ].join(" ");
 }
