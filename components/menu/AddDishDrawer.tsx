@@ -65,6 +65,7 @@ function useDishForm(
         setCategory(initialData.category || "STARTERS");
         setPrice(Number(initialData.price).toString());
         setDescription(initialData.description || "");
+        setImageUrl(initialData.imageUrl || "");
 
         if (initialData.dietary) {
           const dietArray = initialData.dietary
