@@ -10,6 +10,8 @@ import {
   getDietaryTagsAction,
   getIngredientsAction,
 } from "@/actions/catalog.action";
+import TagSelectionField from "./TagSelectionField";
+import ImageUploadBox from "./ImageUploadBox";
 
 interface AddDishDrawerProps {
   isOpen: boolean;
@@ -29,11 +31,11 @@ interface MenuItem {
   ingredients?: string | null;
 }
 
-export default function AddDishDrawer({
-  isOpen,
-  onClose,
-  initialData,
-}: AddDishDrawerProps) {
+function useDishForm(
+  initialData: MenuItem | null | undefined,
+  isOpen: boolean,
+  onClose: () => void
+) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("STARTERS");
   const [price, setPrice] = useState("");
@@ -56,8 +58,8 @@ export default function AddDishDrawer({
         setIngredientTags(freshIngredients);
       };
       fetchCatalogs();
+
       if (initialData) {
-        // Edit Menu Mode
         setName(initialData.name);
         setCategory(initialData.category || "STARTERS");
         setPrice(Number(initialData.price).toString());
@@ -83,7 +85,6 @@ export default function AddDishDrawer({
           setSelectedIngredients([]);
         }
       } else {
-        // Add Menu Mode
         setName("");
         setCategory("STARTERS");
         setPrice("");
@@ -137,51 +138,40 @@ export default function AddDishDrawer({
     });
   };
 
-  // const dietaryTags = [
-  //   "VEGAN",
-  //   "VEGETARIAN",
-  //   "GLUTEN-FREE",
-  //   "DAIRY-FREE",
-  //   "NUT-FREE",
-  //   "HALAL",
-  //   "KOSHER",
-  //   "SPICY",
-  // ];
+  // 🌟 把 UI 需要的数据全部打包返回
+  return {
+    formState: {
+      name,
+      category,
+      price,
+      description,
+      selectedDietary,
+      selectedIngredients,
+    },
+    tags: { dietaryTags, ingredientTags },
+    actions: {
+      setName,
+      setCategory,
+      setPrice,
+      setDescription,
+      toggleDietary,
+      toggleIngredient,
+      handleSubmit,
+    },
+    isPending,
+  };
+}
 
-  // const ingredientTags = [
-  //   "beets",
-  //   "goat cheese",
-  //   "walnuts",
-  //   "citrus vinaigrette",
-  //   "burrata",
-  //   "heritage tomatoes",
-  //   "basil",
-  //   "sourdough",
-  //   "carnaroli rice",
-  //   "porcini",
-  //   "thyme",
-  //   "parmesan",
-  //   "sea bass",
-  //   "fennel",
-  //   "lemon",
-  //   "capers",
-  //   "butter",
-  //   "orecchiette",
-  //   "n'duja",
-  //   "chili",
-  //   "pecorino",
-  //   "broccolini",
-  //   "garlic",
-  //   "potato",
-  //   "truffle oil",
-  //   "dark chocolate",
-  //   "vanilla ice cream",
-  //   "shortcrust",
-  //   "meringue",
-  //   "seasonal fruit",
-  //   "tempranillo",
-  //   "mineral water",
-  // ];
+export default function AddDishDrawer({
+  isOpen,
+  onClose,
+  initialData,
+}: AddDishDrawerProps) {
+  const { formState, tags, actions, isPending } = useDishForm(
+    initialData,
+    isOpen,
+    onClose
+  );
 
   const titleText = initialData ? "Edit dish" : "Add dish";
   const buttonText = initialData ? "Save changes" : "Add dish";
@@ -222,32 +212,7 @@ export default function AddDishDrawer({
 
         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-5">
           {/* Image Upload */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">Image</label>
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 shrink-0">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-                  />
-                </svg>
-              </div>
-              <input
-                type="file"
-                disabled
-                className="text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-50 file:text-slate-700 opacity-50 cursor-not-allowed"
-              />
-            </div>
-          </div>
+          <ImageUploadBox disabled />
 
           {/* Name & Category */}
           <div className="grid grid-cols-2 gap-4">
@@ -256,8 +221,8 @@ export default function AddDishDrawer({
               <input
                 title="dish name"
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={formState.name}
+                onChange={(e) => actions.setName(e.target.value)}
                 placeholder="e.g. Garlic Bread"
                 className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-slate-500"
               />
@@ -268,8 +233,8 @@ export default function AddDishDrawer({
               </label>
               <select
                 title="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                value={formState.category}
+                onChange={(e) => actions.setCategory(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-slate-500 bg-white"
               >
                 <option value="STARTERS">Starters</option>
@@ -290,8 +255,8 @@ export default function AddDishDrawer({
               <input
                 type="number"
                 step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                value={formState.price}
+                onChange={(e) => actions.setPrice(e.target.value)}
                 placeholder="0.00"
                 className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-slate-500"
               />
@@ -315,64 +280,28 @@ export default function AddDishDrawer({
             </label>
             <textarea
               rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={formState.description}
+              onChange={(e) => actions.setDescription(e.target.value)}
               placeholder="Describe the dish..."
               className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-slate-500 resize-none"
             ></textarea>
           </div>
 
           {/* Dietary Fieldset */}
-          <fieldset className="border border-slate-200 rounded-xl p-4 pt-2">
-            <legend className="text-xs font-bold text-slate-500 px-2 tracking-wider">
-              DIETARY
-            </legend>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {dietaryTags.map((tag) => {
-                const isSelected = selectedDietary.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleDietary(tag)}
-                    className={`border px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      isSelected
-                        ? "bg-slate-900 border-slate-900 text-white shadow-sm"
-                        : "border-slate-200 text-slate-600 hover:border-slate-400"
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
+          <TagSelectionField
+            legend="DIETARY"
+            tags={tags.dietaryTags}
+            selectedTags={formState.selectedDietary}
+            onToggle={actions.toggleDietary}
+          />
 
           {/* Ingredients Fieldset */}
-          <fieldset className="border border-slate-200 rounded-xl p-4 pt-2">
-            <legend className="text-xs font-bold text-slate-500 px-2 tracking-wider">
-              INGREDIENTS
-            </legend>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {ingredientTags.map((tag) => {
-                const isSelected = selectedIngredients.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleIngredient(tag)}
-                    className={`border px-3 py-1.5 rounded-full text-xs transition-colors ${
-                      isSelected
-                        ? "bg-slate-900 border-slate-900 text-white shadow-sm"
-                        : "border-slate-200 text-slate-600 hover:border-slate-400"
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
+          <TagSelectionField
+            legend="INGREDIENTS"
+            tags={tags.ingredientTags}
+            selectedTags={formState.selectedIngredients}
+            onToggle={actions.toggleIngredient}
+          />
         </div>
 
         <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
@@ -386,7 +315,7 @@ export default function AddDishDrawer({
           </button>
           <button
             type="button"
-            onClick={handleSubmit}
+            onClick={actions.handleSubmit}
             disabled={isPending}
             className="px-6 py-2.5 text-sm font-semibold text-white bg-[#142653] hover:bg-[#13275a] rounded-lg shadow-sm transition disabled:opacity-50 flex items-center gap-2"
           >
