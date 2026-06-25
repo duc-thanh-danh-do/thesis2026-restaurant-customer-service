@@ -1,56 +1,42 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import StaffReplyBox from "@/components/staff/StaffReplyBox";
-
-const mockMessages = [
-  {
-    id: 1,
-    sender: "assistant",
-    text: "Welcome to Bistro Aurora, table 4. How can I help you today?",
-    time: "23 min ago",
-    avatar: "AI",
-  },
-  {
-    id: 2,
-    sender: "user",
-    text: "Which dishes are vegetarian and do not contain sesame?",
-    time: "22 min ago",
-    avatar: "TR",
-  },
-  {
-    id: 3,
-    sender: "assistant",
-    text: "Three dishes match: Wild Mushroom Risotto, Roasted Beet Salad, and Tomato Orecchiette. None contain sesame.",
-    time: "21 min ago",
-    avatar: "AI",
-  },
-  {
-    id: 4,
-    sender: "user",
-    text: "Can I have the bill, please?",
-    time: "3 min ago",
-    avatar: "TR",
-  },
-  {
-    id: 5,
-    sender: "assistant",
-    text: "Your request has been sent to the staff.",
-    time: "3 min ago",
-    avatar: "AI",
-  },
-];
+import { formatRelativeTime } from "@/lib/utils";
+import { getTableMessagesAction } from "@/actions/chat.action";
 
 export default function StaffConversationPanel({
   tableId,
 }: {
   tableId: string | null;
 }) {
-  const handleSendMessage = (text: string) => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchMessages = useCallback(async () => {
+    if (!tableId) return;
+    setIsLoading(true);
+    try {
+      const data = await getTableMessagesAction(tableId);
+      setMessages(data || []);
+
+      console.log(`Fetching messages for table ${tableId}...`);
+    } catch (error) {
+      console.error("Failed to fetch messages:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tableId]);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  const handleSendMessage = async (text: string) => {
     console.log(`Sending message to table ${tableId}: ${text}`);
   };
-
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden relative">
       {/* Header */}
@@ -69,34 +55,57 @@ export default function StaffConversationPanel({
 
       {/* Chat Messages */}
       <ScrollArea className="flex-1 overflow-y-auto p-4 min-h-0">
-        <div className="space-y-4">
-          {mockMessages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex gap-3 ${
-                msg.sender === "user" ? "flex-row-reverse" : ""
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white flex-shrink-0 ${
-                  msg.sender === "user" ? "bg-slate-700" : "bg-blue-400"
-                }`}
-              >
-                {msg.avatar}
-              </div>
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[70%] ${
-                  msg.sender === "user"
-                    ? "bg-slate-700 text-white"
-                    : "bg-white border border-slate-200"
-                }`}
-              >
-                <p className="text-sm">{msg.text}</p>
-                <p className="text-xs mt-1 text-slate-400">{msg.time}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center p-8 text-sm text-slate-400">
+            Loading conversation...
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex justify-center p-8 text-sm text-slate-400 border border-dashed border-slate-200 rounded-xl mt-4">
+            No active conversation for this table yet.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((msg) => {
+              const isUser =
+                msg.senderType === "customer" ||
+                msg.role === "customer" ||
+                msg.sender === "customer";
+
+              const textContent = msg.messageContent || msg.content || msg.text;
+
+              const avatarText = isUser ? "TR" : "AI";
+
+              const timeStr = msg.createdAt
+                ? formatRelativeTime(msg.createdAt)
+                : "Just now";
+
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white flex-shrink-0 ${
+                      isUser ? "bg-slate-700" : "bg-blue-400"
+                    }`}
+                  >
+                    {avatarText}
+                  </div>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[70%] ${
+                      isUser
+                        ? "bg-slate-700 text-white"
+                        : "bg-white border border-slate-200"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{textContent}</p>
+                    <p className="text-xs mt-1 text-slate-400/80">{timeStr}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </ScrollArea>
 
       <StaffReplyBox onSendMessage={handleSendMessage} />
