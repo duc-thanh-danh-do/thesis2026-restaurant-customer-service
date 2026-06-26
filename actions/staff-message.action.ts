@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
+import { getCurrentStaffUser } from "@/lib/auth";
 
 export async function sendStaffMessageAction(sessionId: number, message: string) {
   const trimmedMessage = message.trim();
@@ -16,6 +17,11 @@ export async function sendStaffMessageAction(sessionId: number, message: string)
   }
 
   try {
+    const staffUser = await getCurrentStaffUser();
+    if (!staffUser) {
+      return { success: false, error: "Staff sign in is required." };
+    }
+
     await prisma.chatMessage.create({
       data: {
         sessionId,

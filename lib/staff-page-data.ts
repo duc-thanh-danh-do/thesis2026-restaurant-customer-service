@@ -282,6 +282,27 @@ export async function getStaffSessionDetail(sessionId: number) {
   }
 }
 
+export async function getActiveStaffSessionForTable(tableNumber: string) {
+  try {
+    const session = await prisma.customerSession.findFirst({
+      where: {
+        status: { not: "closed" },
+        table: { tableNumber },
+      },
+      orderBy: { startedAt: "desc" },
+      select: { id: true },
+    });
+
+    if (!session) return null;
+
+    return getStaffSessionDetail(session.id);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseDemoStaffData()) return null;
+    return fallbackSessions().find((session) => session.tableNumber === tableNumber) ?? null;
+  }
+}
+
 export async function getStaffTables() {
   try {
     const tables = await prisma.restaurantTable.findMany({

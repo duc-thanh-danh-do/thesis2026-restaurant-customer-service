@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
 const datasourceUrl =
@@ -103,6 +104,28 @@ async function upsertKnowledgeBaseRecord(
 
 async function main() {
   const restaurant = await upsertRestaurant();
+  const staffPassword = process.env.STAFF_DEFAULT_PASSWORD ?? "staff1234";
+  const staffPasswordHash = await bcrypt.hash(staffPassword, 12);
+
+  await prisma.staffUser.upsert({
+    where: { email: "staff@testpizza.local" },
+    update: {
+      restaurantId: restaurant.id,
+      name: "Shift Lead",
+      passwordHash: staffPasswordHash,
+      role: "manager",
+      isActive: true,
+    },
+    create: {
+      restaurantId: restaurant.id,
+      name: "Shift Lead",
+      email: "staff@testpizza.local",
+      passwordHash: staffPasswordHash,
+      role: "manager",
+      isActive: true,
+      createdAt: new Date(),
+    },
+  });
 
   for (const tableNumber of ["1", "2"]) {
     await prisma.restaurantTable.upsert({
