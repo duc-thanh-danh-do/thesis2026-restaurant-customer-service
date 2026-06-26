@@ -35,7 +35,15 @@ export default function MenuItemForm({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-            <div className="w-6 h-6 bg-gray-300 rounded"></div>
+            {item.imageUrl ? (
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-6 h-6 bg-gray-300 rounded"></div>
+            )}
           </div>
           <div className="min-w-0">
             <div className="font-medium text-[#142653] flex items-center">
