@@ -2,6 +2,8 @@ import Link from "next/link";
 import { BookOpen, Building2, ChevronRight, QrCode, Utensils, UsersRound, type LucideIcon } from "lucide-react";
 import { getStaffSettingsData } from "@/lib/staff-page-data";
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   const settings = await getStaffSettingsData();
 

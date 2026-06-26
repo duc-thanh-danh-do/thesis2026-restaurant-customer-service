@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Activity, ClipboardList, Plus, QrCode, type LucideIcon } from "lucide-react";
 import { getStaffTables } from "@/lib/staff-page-data";
 
+export const dynamic = "force-dynamic";
+
 function relativeTime(value: Date | null) {
   if (!value) return "No sessions";
   const minutes = Math.max(1, Math.round((Date.now() - value.getTime()) / 60000));
@@ -39,7 +41,14 @@ export default async function StaffTablesPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {tables.map((table) => (
+        {tables.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center md:col-span-2 xl:col-span-3">
+            <h2 className="text-lg font-semibold text-slate-950">No tables available</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Table data could not be loaded, or no restaurant tables have been configured yet.
+            </p>
+          </div>
+        ) : tables.map((table) => (
           <Link
             className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             href={`/tables/${table.id}`}

@@ -2,6 +2,8 @@ import StaffConversationPanel from "@/components/staff/StaffConversationPanel";
 import { getStaffSessionDetail } from "@/lib/staff-page-data";
 import { notFound } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function StaffSessionDetailPage({
   params,
 }: {

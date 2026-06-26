@@ -1,7 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Copy, QrCode } from "lucide-react";
+import QRCode from "qrcode";
+import { ArrowLeft, Download, ExternalLink } from "lucide-react";
 import { getStaffTableDetail } from "@/lib/staff-page-data";
+
+export const dynamic = "force-dynamic";
+
+function getCustomerTableUrl(qrCodeToken: string) {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const vercelBaseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
+  const baseUrl = configuredBaseUrl ?? vercelBaseUrl ?? "http://localhost:3000";
+
+  return `${baseUrl.replace(/\/$/, "")}/table/${qrCodeToken}`;
+}
 
 export default async function TableDetailPage({
   params,
@@ -14,6 +26,12 @@ export default async function TableDetailPage({
   if (!table) notFound();
 
   const qrPath = `/table/${table.qrCodeToken}`;
+  const customerTableUrl = getCustomerTableUrl(table.qrCodeToken);
+  const qrDataUrl = await QRCode.toDataURL(customerTableUrl, {
+    errorCorrectionLevel: "M",
+    margin: 2,
+    scale: 8,
+  });
 
   return (
     <main className="flex-1 p-6">
@@ -40,21 +58,38 @@ export default async function TableDetailPage({
 
       <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
         <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50">
-            <div className="text-center">
-              <QrCode className="mx-auto size-20 text-[#142653]" aria-hidden="true" />
-              <p className="mt-3 text-sm font-semibold text-slate-950">QR code placeholder</p>
-              <p className="mt-1 text-xs text-slate-500">Generated for Table {table.tableNumber}</p>
-            </div>
+          <div className="flex aspect-square items-center justify-center rounded-lg border border-slate-200 bg-white p-6">
+            <Image
+              alt={`QR code for Table ${table.tableNumber}`}
+              className="size-full max-h-72 max-w-72 object-contain"
+              height={288}
+              unoptimized
+              src={qrDataUrl}
+              width={288}
+            />
           </div>
           <div className="mt-4 rounded-lg bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase text-slate-500">Customer entry route</p>
-            <p className="mt-1 break-all font-medium text-slate-950">{qrPath}</p>
+            <p className="mt-1 break-all font-medium text-slate-950">{customerTableUrl}</p>
           </div>
-          <button className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button">
-            <Copy className="size-4" aria-hidden="true" />
-            Copy table link
-          </button>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <a
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#142653] px-3 text-sm font-semibold text-white hover:bg-[#13275a]"
+              download={`table-${table.tableNumber}-qr.png`}
+              href={qrDataUrl}
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Download QR
+            </a>
+            <Link
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              href={qrPath}
+              target="_blank"
+            >
+              <ExternalLink className="size-4" aria-hidden="true" />
+              Open link
+            </Link>
+          </div>
         </section>
 
         <section className="grid gap-4">

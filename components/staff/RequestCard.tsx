@@ -9,7 +9,7 @@ import { formatRelativeTime } from "@/lib/utils";
 interface RequestCardProps {
   id: string | number;
   text: string;
-  time: string;
+  time: string | Date;
   initialStatus: string;
   onRefresh?: () => void;
 }
@@ -28,9 +28,11 @@ export default function RequestCard({
 
   const handleStatusChange = (newStatus: string) => {
     if (newStatus === optimisticStatus) return;
+    const safeId = typeof id === "number" ? id : Number(id);
+    if (!Number.isInteger(safeId) || safeId <= 0) return;
+
     setOptimisticStatus(newStatus);
     startTransition(async () => {
-      const safeId = typeof id === "number" ? id : 1;
       const result = await updateRequestStatus(safeId, newStatus);
       if (!result.success) {
         setOptimisticStatus(initialStatus);

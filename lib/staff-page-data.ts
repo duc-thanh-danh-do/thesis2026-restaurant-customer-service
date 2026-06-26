@@ -8,6 +8,10 @@ import {
 
 const fallbackStartedAt = new Date(Date.now() - 23 * 60 * 1000);
 
+export function canUseDemoStaffData() {
+  return process.env.NODE_ENV !== "production" && process.env.DISABLE_STAFF_DEMO_DATA !== "true";
+}
+
 export type StaffSessionSummary = {
   id: number;
   tableNumber: string;
@@ -221,6 +225,7 @@ export async function getStaffSessions() {
     }));
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseDemoStaffData()) return [];
     return fallbackSessions();
   }
 }
@@ -272,6 +277,7 @@ export async function getStaffSessionDetail(sessionId: number) {
     };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseDemoStaffData()) return null;
     return fallbackSessions().find((session) => session.id === sessionId) ?? fallbackSessions()[0];
   }
 }
@@ -306,6 +312,7 @@ export async function getStaffTables() {
     });
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseDemoStaffData()) return [];
     return fallbackTables.map((table, index): StaffTableSummary => ({
       ...table,
       activeSessions: index === 1 ? 1 : 0,
@@ -342,6 +349,7 @@ export async function getStaffAiLogs() {
     }));
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseDemoStaffData()) return [];
     return [
       {
         id: 1,
@@ -369,6 +377,8 @@ export async function getStaffSettingsData(): Promise<StaffSettingsData> {
     });
 
     if (!restaurant) {
+      if (!canUseDemoStaffData()) return emptyStaffSettingsData();
+
       return {
         restaurant: fallbackRestaurant,
         staffUsers: [],
@@ -400,6 +410,7 @@ export async function getStaffSettingsData(): Promise<StaffSettingsData> {
     };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseDemoStaffData()) return emptyStaffSettingsData();
     return {
       restaurant: fallbackRestaurant,
       staffUsers: [
@@ -417,4 +428,20 @@ export async function getStaffSettingsData(): Promise<StaffSettingsData> {
       knowledgeBaseCount: fallbackKnowledgeBase.length,
     };
   }
+}
+
+function emptyStaffSettingsData(): StaffSettingsData {
+  return {
+    restaurant: {
+      id: 0,
+      name: "Restaurant unavailable",
+      description: "Restaurant settings could not be loaded.",
+      address: null,
+    },
+    staffUsers: [],
+    tableCount: 0,
+    activeTableCount: 0,
+    menuItemCount: 0,
+    knowledgeBaseCount: 0,
+  };
 }
