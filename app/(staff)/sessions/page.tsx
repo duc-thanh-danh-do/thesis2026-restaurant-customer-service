@@ -1,6 +1,8 @@
 import ActiveSessionsTable from "@/components/staff/ActiveSessionsTable";
 import { getStaffSessions } from "@/lib/staff-page-data";
 
+export const dynamic = "force-dynamic";
+
 export default async function StaffSessionsPage() {
   const sessions = await getStaffSessions();
   const openSessions = sessions.filter((session) => session.status !== "closed").length;

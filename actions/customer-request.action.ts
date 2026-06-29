@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
+import { getCurrentStaffUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 // Get requests
@@ -40,6 +41,14 @@ export async function updateRequestStatus(
   newStatus: string
 ) {
   try {
+    const staffUser = await getCurrentStaffUser();
+    if (!staffUser) {
+      return {
+        success: false,
+        error: "Staff sign in is required.",
+      };
+    }
+
     const updatedRequest = await prisma.customerRequest.update({
       where: {
         id: requestId,

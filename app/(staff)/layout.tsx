@@ -1,7 +1,10 @@
 import StaffSidebar from "@/components/navigation/StaffSidebar";
 import StaffTopbar from "@/components/staff/StaffTopbar";
+import { requireStaffUser } from "@/lib/auth";
 
-export default function StaffLayout({ children }: { children: React.ReactNode }) {
+export default async function StaffLayout({ children }: { children: React.ReactNode }) {
+  await requireStaffUser();
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <StaffSidebar />

@@ -14,6 +14,8 @@ interface CreateMenuItemInput {
   imageUrl?: string | null;
 }
 
+type EditMenuItemInput = Partial<CreateMenuItemInput>;
+
 type DecimalLike = number | string | { toString(): string };
 
 type MenuItemRow = {
@@ -146,7 +148,7 @@ export async function toggleMenuItemAvailabilityAction(
 }
 
 // Edit MenuItem
-export async function editMenuItemAction(id: number, data: any) {
+export async function editMenuItemAction(id: number, data: EditMenuItemInput) {
   try {
     const editItem = await prisma.menuItem.update({
       where: { id },
