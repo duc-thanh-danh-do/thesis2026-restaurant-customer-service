@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+
 export class HttpError extends Error {
   constructor(
     message: string,
@@ -13,6 +15,13 @@ export function toErrorResponse(error: unknown) {
     return Response.json(
       { message: error.message, code: error.code },
       { status: error.status },
+    );
+  }
+
+  if (error instanceof ZodError) {
+    return Response.json(
+      { message: "Invalid request data.", code: "VALIDATION_ERROR", issues: error.issues },
+      { status: 400 },
     );
   }
 
