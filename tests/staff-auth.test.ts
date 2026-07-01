@@ -6,6 +6,8 @@ import {
 } from "@/lib/auth";
 
 const originalSecret = process.env.STAFF_SESSION_SECRET;
+const originalAuthSecret = process.env.AUTH_SECRET;
+const originalNextAuthSecret = process.env.NEXTAUTH_SECRET;
 const originalNodeEnv = process.env.NODE_ENV;
 const mutableEnv = process.env as Record<string, string | undefined>;
 
@@ -16,6 +18,18 @@ test.afterEach(() => {
     delete process.env.STAFF_SESSION_SECRET;
   } else {
     process.env.STAFF_SESSION_SECRET = originalSecret;
+  }
+
+  if (originalAuthSecret === undefined) {
+    delete process.env.AUTH_SECRET;
+  } else {
+    process.env.AUTH_SECRET = originalAuthSecret;
+  }
+
+  if (originalNextAuthSecret === undefined) {
+    delete process.env.NEXTAUTH_SECRET;
+  } else {
+    process.env.NEXTAUTH_SECRET = originalNextAuthSecret;
   }
 });
 
@@ -45,4 +59,13 @@ test("rejects malformed staff session cookies", () => {
   assert.equal(verifyStaffSessionCookieValue(undefined), null);
   assert.equal(verifyStaffSessionCookieValue("not-a-session"), null);
   assert.equal(verifyStaffSessionCookieValue("1.not-hex"), null);
+});
+
+test("requires a staff session secret in production", () => {
+  mutableEnv.NODE_ENV = "production";
+  delete process.env.STAFF_SESSION_SECRET;
+  delete process.env.AUTH_SECRET;
+  delete process.env.NEXTAUTH_SECRET;
+
+  assert.throws(() => createStaffSessionCookieValue(42), /STAFF_SESSION_SECRET/);
 });
