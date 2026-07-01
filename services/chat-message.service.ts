@@ -13,6 +13,9 @@ import { generateAiText } from "@/services/ai-assistant.service";
 
 const ACTIVE_SESSION_STATUSES = new Set(["active", "waiting_staff"]);
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+const CONVERSATION_MEMORY_MESSAGE_LIMIT = 10;
+const CONVERSATION_MEMORY_TOKEN_LIMIT = 1200;
+const APPROX_CHARS_PER_TOKEN = 4;
 
 export async function sendCustomerChatMessage(
   sessionToken: string,
@@ -39,8 +42,16 @@ export async function sendCustomerChatMessage(
       throw new HttpError("Restaurant not found", "RESTAURANT_NOT_FOUND", 404);
     }
 
+    const conversationHistory = await getConversationHistory(
+      session.id,
+      customerMessage.id,
+    );
     const groundedContext = buildGroundedContext(restaurant);
-    const prompt = buildGeminiPrompt(groundedContext, message);
+    const prompt = buildGeminiPrompt(
+      groundedContext,
+      conversationHistory,
+      message,
+    );
     const reply = normalizeReply(await generateAiText(prompt));
     const handoverRequired = requiresStaffHandover(message);
 
@@ -71,7 +82,7 @@ export async function sendCustomerChatMessage(
     if (!isDatabaseUnavailable(error)) throw error;
 
     const groundedContext = buildFallbackGroundedContext();
-    const prompt = buildGeminiPrompt(groundedContext, message);
+    const prompt = buildGeminiPrompt(groundedContext, "", message);
     const reply = normalizeReply(await generateAiText(prompt));
     const handoverRequired = requiresStaffHandover(message);
 
@@ -158,7 +169,60 @@ function buildGroundedContext(restaurant: RestaurantContext) {
   ].join("\n");
 }
 
-function buildGeminiPrompt(groundedContext: string, customerMessage: string) {
+async function getConversationHistory(
+  sessionId: number,
+  currentCustomerMessageId: number,
+) {
+  const previousMessages = await prisma.chatMessage.findMany({
+    where: {
+      sessionId,
+      id: { lt: currentCustomerMessageId },
+    },
+    orderBy: { id: "desc" },
+    take: CONVERSATION_MEMORY_MESSAGE_LIMIT,
+  });
+
+  return formatConversationHistory(previousMessages.reverse());
+}
+
+function formatConversationHistory(
+  messages: Array<{ senderType: string; messageContent: string }>,
+) {
+  if (messages.length === 0) return "";
+
+  const lines = messages
+    .filter(({ senderType }) =>
+      ["customer", "ai", "staff"].includes(senderType),
+    )
+    .map(({ senderType, messageContent }) => {
+      const label =
+        senderType === "customer"
+          ? "Customer"
+          : senderType === "ai"
+            ? "Assistant"
+            : "Staff";
+
+      return `${label}: ${messageContent.trim()}`;
+    });
+
+  const maxLength = CONVERSATION_MEMORY_TOKEN_LIMIT * APPROX_CHARS_PER_TOKEN;
+  let history = lines.join("\n");
+
+  while (history.length > maxLength && lines.length > 1) {
+    lines.shift();
+    history = lines.join("\n");
+  }
+
+  if (history.length <= maxLength) return history;
+
+  return history.slice(history.length - maxLength).trimStart();
+}
+
+function buildGeminiPrompt(
+  groundedContext: string,
+  conversationHistory: string,
+  customerMessage: string,
+) {
   return [
     "You are a restaurant customer-service assistant.",
     "Answer concisely and helpfully using only the restaurant data provided below.",
@@ -166,9 +230,14 @@ function buildGeminiPrompt(groundedContext: string, customerMessage: string) {
     "If the answer is not available in the provided data, say that the information is not available.",
     "For allergy questions, do not guarantee safety; recommend confirmation with restaurant staff.",
     "If the customer asks for payment, staff help, complaint handling, or sensitive allergy confirmation, politely say staff may need to assist.",
+    "Use the conversation history only to understand references, preferences, or follow-up wording such as that pizza, the cheaper one, or the same allergen.",
+    "Keep memory scoped to this dining session only. Do not assume long-term customer memory.",
     "",
     "Provided restaurant data:",
     groundedContext,
+    "",
+    "Conversation so far:",
+    conversationHistory || "No previous messages in this dining session.",
     "",
     `Customer message: ${customerMessage}`,
   ].join("\n");

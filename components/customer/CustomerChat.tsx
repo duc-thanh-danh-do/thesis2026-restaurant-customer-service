@@ -5,19 +5,79 @@ import CustomerChatInput from "@/components/customer/CustomerChatInput";
 import ChatMessageBubble from "@/components/customer/ChatMessageBubble";
 import type { UiChatMessage } from "@/types/chat-message";
 
+type StoredChatMessage = {
+  id: number;
+  senderType: string;
+  messageContent: string;
+};
+
+const WELCOME_MESSAGE: UiChatMessage = {
+  id: "welcome",
+  sender: "ai",
+  content:
+    "Hi. I can help with the TestPizza menu, ingredients, allergens, opening hours, and payment information.",
+};
+
+function normalizeSender(senderType: string): UiChatMessage["sender"] {
+  if (["customer", "ai", "staff", "system"].includes(senderType)) {
+    return senderType as UiChatMessage["sender"];
+  }
+
+  return "system";
+}
+
 export default function CustomerChat({ sessionToken }: { sessionToken: string }) {
-  const [messages, setMessages] = useState<UiChatMessage[]>([
-    {
-      id: "welcome",
-      sender: "ai",
-      content:
-        "Hi. I can help with the TestPizza menu, ingredients, allergens, opening hours, and payment information.",
-    },
-  ]);
+  const [messages, setMessages] = useState<UiChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadStoredMessages() {
+      try {
+        const response = await fetch(
+          `/api/customer-sessions/${sessionToken}/messages`,
+        );
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as
+            | { message?: string }
+            | null;
+          throw new Error(payload?.message ?? "Failed to load previous messages");
+        }
+
+        const payload = (await response.json()) as {
+          messages: StoredChatMessage[];
+        };
+
+        if (!isMounted || payload.messages.length === 0) return;
+
+        setMessages(
+          payload.messages.map((message) => ({
+            id: `${message.senderType}-${message.id}`,
+            sender: normalizeSender(message.senderType),
+            content: message.messageContent,
+          })),
+        );
+      } catch (loadError) {
+        if (!isMounted) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load previous messages",
+        );
+      }
+    }
+
+    loadStoredMessages();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionToken]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
