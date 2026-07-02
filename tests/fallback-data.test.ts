@@ -34,3 +34,12 @@ test("does not classify unrelated application errors as database unavailable", (
 
   assert.equal(isDatabaseUnavailable(error), false);
 });
+
+test("handles circular nested errors without crashing", () => {
+  const error: { message: string; cause?: unknown } = {
+    message: "Wrapper error",
+  };
+  error.cause = error;
+
+  assert.equal(isDatabaseUnavailable(error), false);
+});
