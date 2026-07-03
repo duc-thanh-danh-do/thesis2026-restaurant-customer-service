@@ -7,6 +7,7 @@ import {
   fallbackRestaurant,
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
+import { buildCustomerContext, buildGeminiPrompt } from "@/lib/ai/chat-prompt";
 import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
 import { generateAiText } from "@/services/ai-assistant.service";
@@ -46,12 +47,14 @@ export async function sendCustomerChatMessage(
       session.id,
       customerMessage.id,
     );
+    const customerContext = await getCustomerContext(session.id);
     const groundedContext = buildGroundedContext(restaurant);
-    const prompt = buildGeminiPrompt(
+    const prompt = buildGeminiPrompt({
       groundedContext,
+      customerContext,
       conversationHistory,
-      message,
-    );
+      customerMessage: message,
+    });
     const reply = normalizeReply(await generateAiText(prompt));
     const handoverRequired = requiresStaffHandover(message);
 
@@ -82,7 +85,12 @@ export async function sendCustomerChatMessage(
     if (!isDatabaseUnavailable(error)) throw error;
 
     const groundedContext = buildFallbackGroundedContext();
-    const prompt = buildGeminiPrompt(groundedContext, "", message);
+    const prompt = buildGeminiPrompt({
+      groundedContext,
+      customerContext: "",
+      conversationHistory: "",
+      customerMessage: message,
+    });
     const reply = normalizeReply(await generateAiText(prompt));
     const handoverRequired = requiresStaffHandover(message);
 
@@ -185,6 +193,17 @@ async function getConversationHistory(
   return formatConversationHistory(previousMessages.reverse());
 }
 
+async function getCustomerContext(sessionId: number) {
+  const session = await prisma.customerSession.findUnique({
+    where: { id: sessionId },
+    include: { table: true },
+  });
+
+  return buildCustomerContext({
+    tableNumber: session?.table.tableNumber,
+  });
+}
+
 function formatConversationHistory(
   messages: Array<{ senderType: string; messageContent: string }>,
 ) {
@@ -216,31 +235,6 @@ function formatConversationHistory(
   if (history.length <= maxLength) return history;
 
   return history.slice(history.length - maxLength).trimStart();
-}
-
-function buildGeminiPrompt(
-  groundedContext: string,
-  conversationHistory: string,
-  customerMessage: string,
-) {
-  return [
-    "You are a restaurant customer-service assistant.",
-    "Answer concisely and helpfully using only the restaurant data provided below.",
-    "Do not invent menu items, prices, allergens, availability, ingredients, or policies.",
-    "If the answer is not available in the provided data, say that the information is not available.",
-    "For allergy questions, do not guarantee safety; recommend confirmation with restaurant staff.",
-    "If the customer asks for payment, staff help, complaint handling, or sensitive allergy confirmation, politely say staff may need to assist.",
-    "Use the conversation history only to understand references, preferences, or follow-up wording such as that pizza, the cheaper one, or the same allergen.",
-    "Keep memory scoped to this dining session only. Do not assume long-term customer memory.",
-    "",
-    "Provided restaurant data:",
-    groundedContext,
-    "",
-    "Conversation so far:",
-    conversationHistory || "No previous messages in this dining session.",
-    "",
-    `Customer message: ${customerMessage}`,
-  ].join("\n");
 }
 
 function buildFallbackGroundedContext() {
