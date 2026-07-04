@@ -1,19 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { ArrowLeft, Download, ExternalLink } from "lucide-react";
 import { getStaffTableDetail } from "@/lib/staff-page-data";
+import { buildCustomerTableUrl, getAppBaseUrlFromHeaders } from "@/lib/table-url";
 
 export const dynamic = "force-dynamic";
-
-function getCustomerTableUrl(qrCodeToken: string) {
-  const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const vercelBaseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
-  const baseUrl = configuredBaseUrl ?? vercelBaseUrl ?? "http://localhost:3000";
-
-  return `${baseUrl.replace(/\/$/, "")}/table/${qrCodeToken}`;
-}
 
 export default async function TableDetailPage({
   params,
@@ -25,8 +19,11 @@ export default async function TableDetailPage({
 
   if (!table) notFound();
 
-  const qrPath = `/table/${table.qrCodeToken}`;
-  const customerTableUrl = getCustomerTableUrl(table.qrCodeToken);
+  const qrPath = `/table/${encodeURIComponent(table.qrCodeToken)}`;
+  const customerTableUrl = buildCustomerTableUrl(
+    table.qrCodeToken,
+    getAppBaseUrlFromHeaders(await headers()),
+  );
   const qrDataUrl = await QRCode.toDataURL(customerTableUrl, {
     errorCorrectionLevel: "M",
     margin: 2,
@@ -74,7 +71,7 @@ export default async function TableDetailPage({
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <a
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#142653] px-3 text-sm font-semibold text-white hover:bg-[#13275a]"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#142653] px-3 text-sm font-semibold !text-white hover:bg-[#13275a]"
               download={`table-${table.tableNumber}-qr.png`}
               href={qrDataUrl}
             >
@@ -109,7 +106,7 @@ export default async function TableDetailPage({
                 Open sessions and unresolved service requests are surfaced here before the floor team responds.
               </p>
               <p className="rounded-lg bg-slate-50 p-3">
-                A future iteration can replace the placeholder block with a downloadable QR image.
+                The QR image and link use the current deployment domain when this page is opened in production.
               </p>
             </div>
           </div>
