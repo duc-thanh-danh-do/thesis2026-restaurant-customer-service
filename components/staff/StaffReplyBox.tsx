@@ -21,15 +21,15 @@ export default function StaffReplyBox({ onSendMessage }: StaffReplyBoxProps) {
     if (!trimmedMessage) return;
 
     setError(null);
+    setMessage("");
     startTransition(async () => {
       const result = await onSendMessage?.(trimmedMessage);
 
       if (result && !result.success) {
         setError(result.error ?? "Unable to send message.");
+        setMessage(trimmedMessage);
         return;
       }
-
-      setMessage("");
     });
   };
 

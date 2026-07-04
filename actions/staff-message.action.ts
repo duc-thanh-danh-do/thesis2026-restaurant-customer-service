@@ -22,7 +22,7 @@ export async function sendStaffMessageAction(sessionId: number, message: string)
       return { success: false, error: "Staff sign in is required." };
     }
 
-    await prisma.chatMessage.create({
+    const messageRecord = await prisma.chatMessage.create({
       data: {
         sessionId,
         senderType: "staff",
@@ -35,7 +35,15 @@ export async function sendStaffMessageAction(sessionId: number, message: string)
     revalidatePath("/sessions");
     revalidatePath("/dashboard");
 
-    return { success: true };
+    return {
+      success: true,
+      message: {
+        id: messageRecord.id,
+        senderType: messageRecord.senderType,
+        messageContent: messageRecord.messageContent,
+        createdAt: messageRecord.createdAt,
+      },
+    };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
       return { success: false, error: "Database is unavailable. Please try again later." };
