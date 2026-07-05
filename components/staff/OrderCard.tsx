@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Check, Plus } from "lucide-react";
 import {
-  updateOrderStatus,
   updateItemQuantityAction,
+  updateOrderStatus,
 } from "@/actions/customer-order.action";
 import { Button } from "@/components/ui/button";
 
@@ -22,7 +22,22 @@ interface OrderCardProps {
   time: string;
   initialStatus: string;
   items: OrderItem[];
-  onRefresh?: () => void; //Receiving updates
+  onRefresh?: () => void;
+}
+
+function normalizeOrderStatus(status: string) {
+  const normalized = status.trim().toLowerCase();
+
+  if (normalized === "placed") return "Placed";
+  if (normalized === "preparing") return "Preparing";
+  if (normalized === "ready") return "Ready";
+  if (normalized === "served") return "Served";
+
+  return status.trim();
+}
+
+function getOrderId(value: string) {
+  return Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
 }
 
 export default function OrderCard({
@@ -32,194 +47,183 @@ export default function OrderCard({
   items,
   onRefresh,
 }: OrderCardProps) {
-  const [optimisticStatus, setOptimisticStatus] = useState(initialStatus);
+  const [optimisticStatus, setOptimisticStatus] = useState(normalizeOrderStatus(initialStatus));
   const [optimisticItems, setOptimisticItems] = useState(items);
-  const initialCalculatedTotal = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
   const [optimisticTotal, setOptimisticTotal] = useState(
-    initialCalculatedTotal
+    items.reduce((sum, item) => sum + item.price * item.quantity, 0),
   );
+  const [error, setError] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingQuantity, setUpdatingQuantity] = useState(false);
 
-  const [isPending, startTransition] = useTransition();
+  const activeStep = Math.max(0, stepStatuses.indexOf(optimisticStatus));
+  const numericOrderId = getOrderId(id);
+  const isBusy = updatingStatus || updatingQuantity;
 
-  const activeStep =
-    stepStatuses.indexOf(optimisticStatus) >= 0
-      ? stepStatuses.indexOf(optimisticStatus)
-      : 0;
+  const handleStatusChange = async (nextStatus: string) => {
+    if (!Number.isInteger(numericOrderId)) {
+      setError("Invalid order.");
+      return;
+    }
+
+    const previousStatus = optimisticStatus;
+    setError(null);
+    setOptimisticStatus(nextStatus);
+    setUpdatingStatus(true);
+
+    try {
+      const result = await updateOrderStatus(numericOrderId, nextStatus);
+
+      if (!result.success) {
+        setOptimisticStatus(previousStatus);
+        setError(result.error ?? "Unable to update order status.");
+        return;
+      }
+
+      setOptimisticStatus(result.status ?? nextStatus);
+      onRefresh?.();
+    } catch {
+      setOptimisticStatus(previousStatus);
+      setError("Unable to update order status.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleQuantityChange = async (item: OrderItem, nextQuantity: number) => {
+    if (!Number.isInteger(numericOrderId)) {
+      setError("Invalid order.");
+      return;
+    }
+
+    setError(null);
+
+    if (nextQuantity <= 0) {
+      setOptimisticItems((previousItems) => previousItems.filter((currentItem) => currentItem.id !== item.id));
+    } else {
+      setOptimisticItems((previousItems) =>
+        previousItems.map((currentItem) =>
+          currentItem.id === item.id ? { ...currentItem, quantity: nextQuantity } : currentItem,
+        ),
+      );
+    }
+
+    setOptimisticTotal((previousTotal) => previousTotal + item.price * (nextQuantity - item.quantity));
+    setUpdatingQuantity(true);
+
+    try {
+      const result = await updateItemQuantityAction(numericOrderId, item.id, nextQuantity);
+
+      if (!result.success) {
+        setError(result.error ?? "Unable to update item quantity.");
+      }
+
+      onRefresh?.();
+    } catch {
+      setError("Unable to update item quantity.");
+    } finally {
+      setUpdatingQuantity(false);
+    }
+  };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-        <div className="flex items-center justify-between">
-          <span className="font-medium text-slate-700">
-            {time}
-          </span>
-          <span className="font-semibold text-slate-800">
-            €{optimisticTotal.toFixed(2)}
-          </span>
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-medium text-slate-700">{time}</span>
+          <span className="font-semibold text-slate-800">EUR {optimisticTotal.toFixed(2)}</span>
         </div>
       </div>
 
-      {/* Progress Section */}
-      <div className="px-4 py-4 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-medium text-slate-400">
-            PROGRESS
-          </span>
-          <span className="text-sm font-medium text-slate-700">
-            {optimisticStatus}
+      <div className="border-b border-slate-100 px-4 py-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-xs font-medium uppercase text-slate-400">Progress</span>
+          <span className="text-sm font-semibold text-slate-700">
+            {updatingStatus ? "Updating..." : optimisticStatus}
           </span>
         </div>
 
-        {/* Progress Bar */}
-        <div className="flex items-center gap-1 w-full">
-          {stepStatuses.map((step, i) => (
+        <div className="grid grid-cols-4 gap-1">
+          {stepStatuses.map((step, index) => (
             <button
+              aria-pressed={step === optimisticStatus}
+              className="group flex min-w-0 flex-col items-center gap-1 border-none bg-transparent p-0 text-center disabled:cursor-not-allowed"
+              disabled={updatingStatus}
               key={step}
-              disabled={isPending}
-              onClick={() => {
-                startTransition(async () => {
-                  setOptimisticStatus(step);
-                  const numericId = parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                  const result = await updateOrderStatus(numericId, step);
-                  if (result.success && onRefresh) {
-                    onRefresh();
-                  }
-                });
-              }}
-              className="flex-1 flex items-center group cursor-pointer border-none bg-transparent p-0 text-left"
+              onClick={() => handleStatusChange(step)}
+              type="button"
             >
-              <div
-                className={`
-                  w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors flex-shrink-0
-                  ${
-                    i <= activeStep
-                      ? "bg-blue-500 text-white"
-                      : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
-                  }
-                `}
-              >
-                {i < activeStep ? (
-                  <Check className="h-3 w-3" />
-                ) : (
-                  <span>{i + 1}</span>
-                )}
-              </div>
-              {i < stepStatuses.length - 1 && (
+              <div className="flex w-full items-center">
                 <div
-                  className={`flex-1 h-0.5 mx-1 ${
-                    i < activeStep ? "bg-blue-500" : "bg-slate-100"
+                  className={`h-0.5 flex-1 ${
+                    index === 0 ? "bg-transparent" : index <= activeStep ? "bg-blue-500" : "bg-slate-100"
                   }`}
                 />
-              )}
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                    index <= activeStep
+                      ? "bg-blue-500 text-white"
+                      : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
+                  }`}
+                >
+                  {index < activeStep ? <Check className="h-4 w-4" aria-hidden="true" /> : index + 1}
+                </div>
+                <div
+                  className={`h-0.5 flex-1 ${
+                    index === stepStatuses.length - 1
+                      ? "bg-transparent"
+                      : index < activeStep
+                        ? "bg-blue-500"
+                        : "bg-slate-100"
+                  }`}
+                />
+              </div>
+              <span className="w-full truncate text-[10px] font-medium uppercase text-slate-400">
+                {step}
+              </span>
             </button>
           ))}
         </div>
 
-        <div className="flex justify-between mt-1">
-          {stepStatuses.map((step) => (
-            <span key={step} className="text-[10px] text-slate-400 uppercase">
-              {step}
-            </span>
-          ))}
-        </div>
+        {error ? <p className="mt-3 text-xs font-medium text-red-600">{error}</p> : null}
       </div>
 
-      {/* Items Section */}
       <div className="p-4">
         <div className="space-y-3">
-          {optimisticItems.map((item, i) => (
+          {optimisticItems.map((item) => (
             <div
-              key={item.id || i}
-              className="flex items-center justify-between"
+              className="rounded-lg bg-slate-50 p-3"
+              key={item.id}
             >
-              <div className="flex items-center gap-2">
+              <p className="break-words text-sm font-medium leading-5 text-slate-700">{item.name}</p>
+              <div className="mt-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-1">
-                  {/* Minus*/}
                   <Button
-                    variant="outline"
+                    className="h-7 w-7 rounded-full border-slate-300 bg-white"
+                    disabled={isBusy}
+                    onClick={() => handleQuantityChange(item, item.quantity - 1)}
                     size="icon"
-                    disabled={isPending}
-                    onClick={() => {
-                      const newQuantity = item.quantity - 1;
-
-                      if (newQuantity <= 0) {
-                        setOptimisticItems((prev) =>
-                          prev.filter((x) => x.id !== item.id)
-                        );
-                      } else {
-                        setOptimisticItems((prev) =>
-                          prev.map((x) =>
-                            x.id === item.id
-                              ? { ...x, quantity: newQuantity }
-                              : x
-                          )
-                        );
-                      }
-                      setOptimisticTotal((prev) => prev - item.price);
-
-                      startTransition(async () => {
-                        const numericOrderId =
-                          parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        const result = await updateItemQuantityAction(
-                          numericOrderId,
-                          item.id,
-                          newQuantity
-                        );
-                        if (result.success && onRefresh) {
-                          onRefresh();
-                        }
-                      });
-                    }}
-                    className="h-6 w-6 rounded-full border-slate-300"
+                    type="button"
+                    variant="outline"
                   >
                     <span className="text-xs">-</span>
                   </Button>
-
-                  <span className="w-6 text-center text-sm">
-                    {item.quantity}
-                  </span>
-
-                  {/* plus */}
+                  <span className="w-7 text-center text-sm font-semibold text-slate-800">{item.quantity}</span>
                   <Button
-                    variant="outline"
+                    className="h-7 w-7 rounded-full border-slate-300 bg-white"
+                    disabled={isBusy}
+                    onClick={() => handleQuantityChange(item, item.quantity + 1)}
                     size="icon"
-                    disabled={isPending}
-                    onClick={() => {
-                      const newQuantity = item.quantity + 1;
-
-                      setOptimisticItems((prev) =>
-                        prev.map((x) =>
-                          x.id === item.id ? { ...x, quantity: newQuantity } : x
-                        )
-                      );
-                      setOptimisticTotal((prev) => prev + item.price);
-
-                      startTransition(async () => {
-                        const numericOrderId =
-                          parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        const result = await updateItemQuantityAction(
-                          numericOrderId,
-                          item.id,
-                          newQuantity
-                        );
-                        if (result.success && onRefresh) {
-                          onRefresh();
-                        }
-                      });
-                    }}
-                    className="h-6 w-6 rounded-full border-slate-300"
+                    type="button"
+                    variant="outline"
                   >
-                    <Plus className="h-3 w-3" />
+                    <Plus className="h-3 w-3" aria-hidden="true" />
                   </Button>
                 </div>
-                <span className="text-sm text-slate-700">{item.name}</span>
+                <span className="whitespace-nowrap text-right text-sm font-semibold text-slate-700">
+                  EUR {(item.price * item.quantity).toFixed(2)}
+                </span>
               </div>
-              <span className="text-sm font-medium text-slate-700">
-                €{(item.price * item.quantity).toFixed(2)}
-              </span>
             </div>
           ))}
         </div>

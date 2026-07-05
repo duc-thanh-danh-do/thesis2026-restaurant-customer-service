@@ -1,5 +1,6 @@
 "use server";
 
+import { getCurrentStaffUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { revalidatePath } from "next/cache";
@@ -11,20 +12,67 @@ type OrderItemRow = {
   quantity: number;
 };
 
+const CLOSED_ORDER_STATUSES = [
+  "Served",
+  "served",
+  "Paid",
+  "paid",
+  "Cancelled",
+  "cancelled",
+];
+const ACTIVE_SESSION_STATUSES = ["active", "waiting_staff"];
+
+function normalizeOrderStatus(status: string) {
+  const normalized = status.trim().toLowerCase();
+
+  if (normalized === "placed") return "Placed";
+  if (normalized === "preparing") return "Preparing";
+  if (normalized === "ready") return "Ready";
+  if (normalized === "served") return "Served";
+  if (normalized === "paid") return "Paid";
+  if (normalized === "cancelled") return "Cancelled";
+
+  return status.trim();
+}
+
 export async function updateOrderStatus(orderId: number, status: string) {
+  const nextStatus = normalizeOrderStatus(status);
+
   try {
-    // update order status
+    const staffUser = await getCurrentStaffUser();
+
+    if (!staffUser) {
+      return { success: false, error: "Staff sign in is required." };
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        id: orderId,
+        session: {
+          restaurantId: staffUser.restaurantId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!order) {
+      return { success: false, error: "Order not found." };
+    }
+
     await prisma.order.update({
-      where: { id: orderId },
-      data: { status: status },
+      where: { id: order.id },
+      data: { status: nextStatus },
     });
 
     revalidatePath("/dashboard");
 
-    return { success: true };
+    return { success: true, status: nextStatus };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return { success: false, error: "Database is unavailable. Please try again later." };
+      return {
+        success: false,
+        error: "Database is unavailable. Please try again later.",
+      };
     }
 
     console.error(" Failed to update order status:", error);
@@ -60,15 +108,23 @@ export async function updateOrderStatus(orderId: number, status: string) {
 
 export async function getTableOrderAction(tableNumber: string) {
   try {
+    const staffUser = await getCurrentStaffUser();
+
+    if (!staffUser) return null;
+
     const order = await prisma.order.findFirst({
       where: {
         session: {
+          restaurantId: staffUser.restaurantId,
+          status: {
+            in: ACTIVE_SESSION_STATUSES,
+          },
           table: {
             tableNumber: tableNumber,
           },
         },
         status: {
-          notIn: ["Served", "Paid", "Cancelled"],
+          notIn: CLOSED_ORDER_STATUSES,
         },
       },
       include: {
@@ -90,7 +146,7 @@ export async function getTableOrderAction(tableNumber: string) {
           })
         : "Just now",
       total: Number(order.total),
-      status: order.status,
+      status: normalizeOrderStatus(order.status),
       items: order.orderItems.map((item: OrderItemRow) => ({
         id: item.id,
         name: item.name,
@@ -107,29 +163,59 @@ export async function getTableOrderAction(tableNumber: string) {
 export async function updateItemQuantityAction(
   orderId: number,
   itemId: number,
-  newQuantity: number
+  newQuantity: number,
 ) {
   try {
+    const staffUser = await getCurrentStaffUser();
+
+    if (!staffUser) {
+      return { success: false, error: "Staff sign in is required." };
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        id: orderId,
+        session: {
+          restaurantId: staffUser.restaurantId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!order) {
+      return { success: false, error: "Order not found." };
+    }
+
     if (newQuantity <= 0) {
-      await prisma.orderItem.delete({ where: { id: itemId } });
+      const deleted = await prisma.orderItem.deleteMany({
+        where: { id: itemId, orderId: order.id },
+      });
+
+      if (deleted.count === 0) {
+        return { success: false, error: "Order item not found." };
+      }
     } else {
-      await prisma.orderItem.update({
-        where: { id: itemId },
+      const updated = await prisma.orderItem.updateMany({
+        where: { id: itemId, orderId: order.id },
         data: { quantity: newQuantity },
       });
+
+      if (updated.count === 0) {
+        return { success: false, error: "Order item not found." };
+      }
     }
 
     const updatedItems = (await prisma.orderItem.findMany({
-      where: { orderId },
+      where: { orderId: order.id },
     })) as OrderItemRow[];
     const newTotal = updatedItems.reduce(
       (sum, item) => sum + Number(item.price) * item.quantity,
-      0
+      0,
     );
 
     // update total price
     await prisma.order.update({
-      where: { id: orderId },
+      where: { id: order.id },
       data: { total: newTotal },
     });
 
@@ -137,7 +223,10 @@ export async function updateItemQuantityAction(
     return { success: true };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return { success: false, error: "Database is unavailable. Please try again later." };
+      return {
+        success: false,
+        error: "Database is unavailable. Please try again later.",
+      };
     }
 
     console.error("Failed to update quantity:", error);
@@ -147,10 +236,20 @@ export async function updateItemQuantityAction(
 
 export async function getActiveOrdersAction() {
   try {
+    const staffUser = await getCurrentStaffUser();
+
+    if (!staffUser) return [];
+
     const activeOrders = await prisma.order.findMany({
       where: {
         status: {
-          notIn: ["Served", "Paid", "Cancelled"],
+          notIn: CLOSED_ORDER_STATUSES,
+        },
+        session: {
+          restaurantId: staffUser.restaurantId,
+          status: {
+            in: ACTIVE_SESSION_STATUSES,
+          },
         },
       },
       include: {
@@ -168,6 +267,7 @@ export async function getActiveOrdersAction() {
 
     return activeOrders.map((order) => ({
       ...order,
+      status: normalizeOrderStatus(order.status),
       total: Number(order.total),
       orderItems: order.orderItems.map((item) => ({
         ...item,
