@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { HttpError, toErrorResponse } from "@/lib/http-errors";
+import { createCustomerSession } from "@/services/customer-session.service";
 
 const ACTIVE_SESSION_STATUSES = ["active", "waiting_staff"];
 
@@ -90,7 +90,9 @@ export async function POST(request: Request) {
       items?: Record<string, number>;
     };
 
-    if (!body.qrToken)
+    const qrToken = body.qrToken;
+
+    if (!qrToken)
       throw new HttpError("QR token is required", "QR_TOKEN_REQUIRED", 400);
     if (!body.items)
       throw new HttpError(
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
       );
 
     const table = await prisma.restaurantTable.findUnique({
-      where: { qrCodeToken: body.qrToken },
+      where: { qrCodeToken: qrToken },
     });
 
     if (!table)
@@ -148,17 +150,7 @@ export async function POST(request: Request) {
         })
       : null;
 
-    const activeSession =
-      session ??
-      (await prisma.customerSession.create({
-        data: {
-          restaurantId: table.restaurantId,
-          tableId: table.id,
-          sessionToken: `sess_${randomUUID()}`,
-          status: "active",
-          startedAt: new Date(),
-        },
-      }));
+    const activeSession = session ?? (await createCustomerSession(qrToken)).session;
 
     const orderItems = menuItems
       .map((menuItem) => {
