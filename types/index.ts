@@ -16,7 +16,7 @@ export interface CartItem {
 export interface Order {
   id: string;
   tableNumber: number;
-  status: 'placed' | 'preparing' | 'ready' | 'served';
+  status: 'unconfirmed' | 'placed' | 'preparing' | 'ready' | 'served';
   items: CartItem[];
   total: number;
   placedAt: Date;

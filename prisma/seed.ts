@@ -391,11 +391,11 @@ async function main() {
   const existingSession = await prisma.customerSession.findFirst();
 
   if (existingSession) {
-    // Create a real order with initial status "Preparing"
+    // Create a real staff-visible order with initial status "preparing"
     const newOrder = await prisma.order.create({
       data: {
         sessionId: existingSession.id,
-        status: "Preparing",
+        status: "preparing",
         total: 26.5,
 
         orderItems: {

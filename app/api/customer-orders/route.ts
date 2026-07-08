@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { HttpError, toErrorResponse } from "@/lib/http-errors";
-import { createCustomerSession } from "@/services/customer-session.service";
+import { createUnconfirmedOrder } from "@/services/customer-order.service";
 
 const ACTIVE_SESSION_STATUSES = ["active", "waiting_staff"];
 
@@ -101,95 +101,16 @@ export async function POST(request: Request) {
         400,
       );
 
-    const table = await prisma.restaurantTable.findUnique({
-      where: { qrCodeToken: qrToken },
-    });
-
-    if (!table)
-      throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
-
-    const requestedItems = Object.entries(body.items)
-      .map(([itemId, quantity]) => ({
-        id: Number(itemId),
-        quantity,
-      }))
-      .filter((item) => Number.isInteger(item.id) && item.quantity > 0);
-
-    if (requestedItems.length === 0) {
-      throw new HttpError("Order has no valid items", "ORDER_EMPTY", 400);
-    }
-
-    const menuItems = await prisma.menuItem.findMany({
-      where: {
-        id: { in: requestedItems.map((item) => item.id) },
-        restaurantId: table.restaurantId,
-        isAvailable: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-      },
-    });
-
-    if (menuItems.length === 0) {
-      throw new HttpError(
-        "Order has no available menu items",
-        "ORDER_EMPTY",
-        400,
-      );
-    }
-
-    const session = body.sessionToken
-      ? await prisma.customerSession.findFirst({
-          where: {
-            sessionToken: body.sessionToken,
-            tableId: table.id,
-            status: { in: ACTIVE_SESSION_STATUSES },
-          },
-        })
-      : null;
-
-    const activeSession = session ?? (await createCustomerSession(qrToken)).session;
-
-    const orderItems = menuItems
-      .map((menuItem) => {
-        const requestedItem = requestedItems.find(
-          (item) => item.id === menuItem.id,
-        );
-        const quantity = requestedItem?.quantity ?? 0;
-
-        return {
-          name: menuItem.name,
-          price: Number(menuItem.price),
-          quantity,
-        };
-      })
-      .filter((item) => item.quantity > 0);
-
-    const total = orderItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    );
-
-    const order = await prisma.order.create({
-      data: {
-        sessionId: activeSession.id,
-        status: "preparing",
-        total,
-        orderItems: {
-          create: orderItems,
-        },
-      },
-      include: {
-        orderItems: true,
-      },
+    const { order, sessionToken } = await createUnconfirmedOrder({
+      qrToken,
+      sessionToken: body.sessionToken,
+      items: body.items,
     });
 
     return Response.json(
       {
         order,
-        sessionToken: activeSession.sessionToken,
+        sessionToken,
       },
       { status: 201 },
     );
