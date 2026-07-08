@@ -12,15 +12,29 @@ export type CreateTableState = {
   error?: string;
 };
 
-type CreateRestaurantTableActionDeps = {
-  getCurrentStaffUser: typeof getCurrentStaffUser;
-  findRestaurant: typeof prisma.restaurant.findFirst;
-  findRestaurantTable: typeof prisma.restaurantTable.findFirst;
-  createRestaurantTable: typeof prisma.restaurantTable.create;
-  createToken: typeof createToken;
-  isDatabaseUnavailable: typeof isDatabaseUnavailable;
-  revalidatePath: typeof revalidatePath;
-  redirect: typeof redirect;
+export type CreateRestaurantTableActionDeps = {
+  getCurrentStaffUser: () => Promise<{ restaurantId: number } | null>;
+  findRestaurantTable: (args: {
+    where: {
+      restaurantId: number;
+      tableNumber: { equals: string; mode: "insensitive" };
+    };
+    select: { id: true };
+  }) => Promise<{ id: number } | null>;
+  createRestaurantTable: (args: {
+    data: {
+      restaurantId: number;
+      tableNumber: string;
+      qrCodeToken: string;
+      isActive: boolean;
+      createdAt: Date;
+    };
+    select: { id: true };
+  }) => Promise<{ id: number }>;
+  createToken: (prefix: string) => string;
+  isDatabaseUnavailable: (error: unknown) => boolean;
+  revalidatePath: (path: string) => void;
+  redirect: (path: string) => never;
 };
 
 async function getRestaurantId() {
@@ -106,7 +120,6 @@ export async function createRestaurantTableAction(
   return createRestaurantTableActionCore(
     {
       getCurrentStaffUser,
-      findRestaurant: prisma.restaurant.findFirst,
       findRestaurantTable: prisma.restaurantTable.findFirst,
       createRestaurantTable: prisma.restaurantTable.create,
       createToken,
