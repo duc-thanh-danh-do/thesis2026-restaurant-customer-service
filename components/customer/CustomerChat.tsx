@@ -135,8 +135,8 @@ export default function CustomerChat({ sessionToken }: { sessionToken: string })
   }
 
   return (
-    <main className="flex min-h-[calc(100vh-4.5rem)] flex-col px-4 py-6">
-      <header className="mb-4">
+    <main className="flex h-full min-h-0 flex-col px-4 py-6">
+      <header className="mb-4 shrink-0">
         <p className="text-sm font-medium text-neutral-500">TestPizza</p>
         <h1 className="mt-1 text-2xl font-bold">AI Assistant</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-600">
@@ -150,7 +150,7 @@ export default function CustomerChat({ sessionToken }: { sessionToken: string })
         </div>
       ) : null}
 
-      <section className="flex-1 space-y-3 pb-4">
+      <section className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-4">
         {messages.map((message) => (
           <ChatMessageBubble key={message.id} message={message} />
         ))}

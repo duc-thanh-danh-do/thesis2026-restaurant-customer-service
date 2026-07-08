@@ -9,7 +9,7 @@ export default function CustomerBottomBar({ sessionToken }: { sessionToken: stri
   ];
 
   return (
-    <nav className="sticky bottom-0 grid grid-cols-3 border-t border-neutral-200 bg-white">
+    <nav className="grid shrink-0 grid-cols-3 border-t border-neutral-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
       {links.map((item) => {
         const Icon = item.icon;
         return (

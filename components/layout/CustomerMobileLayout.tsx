@@ -11,9 +11,9 @@ interface CustomerMobileLayoutProps {
 
 export function CustomerMobileLayout({ children, className }: CustomerMobileLayoutProps) {
   return (
-    <div className="min-h-dvh bg-[#f5f9fc]">
+    <div className="h-dvh min-h-dvh overflow-hidden bg-[#f5f9fc]">
       <div className={cn(
-        "relative flex min-h-dvh w-full flex-col overflow-hidden bg-white",
+        "relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white",
         className
       )}>
         {children}
@@ -30,7 +30,7 @@ interface CustomerMobileHeaderProps {
 
 export function CustomerMobileHeader({ title, subtitle, rightElement }: CustomerMobileHeaderProps) {
   return (
-    <div className="bg-white border-b border-[#d5e1ec] px-4 pt-5 pb-4 sm:px-5 sm:pt-12">
+    <div className="shrink-0 bg-white border-b border-[#d5e1ec] px-4 pt-5 pb-4 sm:px-5 sm:pt-12">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-[#142653]">{title}</h1>
@@ -67,7 +67,7 @@ export function CustomerBottomNav({ activeTab, cartCount, orderCount, basePath, 
   };
 
   return (
-    <div className="bg-white border-t border-[#d5e1ec] px-6 py-3 pb-6">
+    <div className="shrink-0 border-t border-[#d5e1ec] bg-white px-6 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(20,38,83,0.08)]">
       <div className="flex justify-around items-center">
         {navItems.map((item) => (
           <button

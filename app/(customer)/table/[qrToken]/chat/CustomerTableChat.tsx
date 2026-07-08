@@ -209,7 +209,7 @@ export default function CustomerTableChat({
         }
       />
 
-      <div className="flex items-center justify-between gap-3 border-b border-[#d5e1ec] bg-white px-4 py-3">
+      <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#d5e1ec] bg-white px-4 py-3">
         <div className="min-w-0">
           <span className="text-sm font-medium text-[#142653]">
             {restaurantName}
@@ -221,7 +221,7 @@ export default function CustomerTableChat({
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#f5f9fc] px-4 py-4 pb-28">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-[#f5f9fc] px-4 py-4">
         <div className="w-full space-y-4">
           {messages.map((msg) => (
             <div
@@ -296,7 +296,7 @@ export default function CustomerTableChat({
         </div>
       </div>
 
-      <div className="border-t border-[#d5e1ec] bg-white p-4">
+      <div className="shrink-0 border-t border-[#d5e1ec] bg-white p-4">
         <div className="w-full">
           <div className="mb-3 flex gap-2 overflow-x-auto">
             <button
