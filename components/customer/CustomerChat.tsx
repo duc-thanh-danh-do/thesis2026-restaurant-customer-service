@@ -5,19 +5,79 @@ import CustomerChatInput from "@/components/customer/CustomerChatInput";
 import ChatMessageBubble from "@/components/customer/ChatMessageBubble";
 import type { UiChatMessage } from "@/types/chat-message";
 
+type StoredChatMessage = {
+  id: number;
+  senderType: string;
+  messageContent: string;
+};
+
+const WELCOME_MESSAGE: UiChatMessage = {
+  id: "welcome",
+  sender: "ai",
+  content:
+    "Hi. I can help with the TestPizza menu, ingredients, allergens, opening hours, and payment information.",
+};
+
+function normalizeSender(senderType: string): UiChatMessage["sender"] {
+  if (["customer", "ai", "staff", "system"].includes(senderType)) {
+    return senderType as UiChatMessage["sender"];
+  }
+
+  return "system";
+}
+
 export default function CustomerChat({ sessionToken }: { sessionToken: string }) {
-  const [messages, setMessages] = useState<UiChatMessage[]>([
-    {
-      id: "welcome",
-      sender: "ai",
-      content:
-        "Hi. I can help with the TestPizza menu, ingredients, allergens, opening hours, and payment information.",
-    },
-  ]);
+  const [messages, setMessages] = useState<UiChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadStoredMessages() {
+      try {
+        const response = await fetch(
+          `/api/customer-sessions/${sessionToken}/messages`,
+        );
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as
+            | { message?: string }
+            | null;
+          throw new Error(payload?.message ?? "Failed to load previous messages");
+        }
+
+        const payload = (await response.json()) as {
+          messages: StoredChatMessage[];
+        };
+
+        if (!isMounted || payload.messages.length === 0) return;
+
+        setMessages(
+          payload.messages.map((message) => ({
+            id: `${message.senderType}-${message.id}`,
+            sender: normalizeSender(message.senderType),
+            content: message.messageContent,
+          })),
+        );
+      } catch (loadError) {
+        if (!isMounted) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load previous messages",
+        );
+      }
+    }
+
+    loadStoredMessages();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionToken]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,8 +135,8 @@ export default function CustomerChat({ sessionToken }: { sessionToken: string })
   }
 
   return (
-    <main className="flex min-h-[calc(100vh-4.5rem)] flex-col px-4 py-6">
-      <header className="mb-4">
+    <main className="flex h-full min-h-0 flex-col px-4 py-6">
+      <header className="mb-4 shrink-0">
         <p className="text-sm font-medium text-neutral-500">TestPizza</p>
         <h1 className="mt-1 text-2xl font-bold">AI Assistant</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-600">
@@ -90,7 +150,7 @@ export default function CustomerChat({ sessionToken }: { sessionToken: string })
         </div>
       ) : null}
 
-      <section className="flex-1 space-y-3 pb-4">
+      <section className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-4">
         {messages.map((message) => (
           <ChatMessageBubble key={message.id} message={message} />
         ))}

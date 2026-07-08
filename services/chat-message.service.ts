@@ -7,6 +7,7 @@ import {
   fallbackRestaurant,
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
+import { buildCustomerContext, buildGeminiPrompt } from "@/lib/ai/chat-prompt";
 import { logger } from "@/lib/logger";
 import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
@@ -14,6 +15,9 @@ import { generateAiText } from "@/services/ai-assistant.service";
 
 const ACTIVE_SESSION_STATUSES = new Set(["active", "waiting_staff"]);
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+const CONVERSATION_MEMORY_MESSAGE_LIMIT = 10;
+const CONVERSATION_MEMORY_TOKEN_LIMIT = 1200;
+const APPROX_CHARS_PER_TOKEN = 4;
 
 export async function sendCustomerChatMessage(
   sessionToken: string,
@@ -40,8 +44,18 @@ export async function sendCustomerChatMessage(
       throw new HttpError("Restaurant not found", "RESTAURANT_NOT_FOUND", 404);
     }
 
+    const conversationHistory = await getConversationHistory(
+      session.id,
+      customerMessage.id,
+    );
+    const customerContext = await getCustomerContext(session.id);
     const groundedContext = buildGroundedContext(restaurant);
-    const prompt = buildGeminiPrompt(groundedContext, message);
+    const prompt = buildGeminiPrompt({
+      groundedContext,
+      customerContext,
+      conversationHistory,
+      customerMessage: message,
+    });
     const reply = await generateReplyWithFallback({
       restaurant,
       groundedContext,
@@ -77,7 +91,12 @@ export async function sendCustomerChatMessage(
     if (!isDatabaseUnavailable(error)) throw error;
 
     const groundedContext = buildFallbackGroundedContext();
-    const prompt = buildGeminiPrompt(groundedContext, message);
+    const prompt = buildGeminiPrompt({
+      groundedContext,
+      customerContext: "",
+      conversationHistory: "",
+      customerMessage: message,
+    });
     const reply = normalizeReply(await generateAiText(prompt));
     const handoverRequired = requiresStaffHandover(message);
 
@@ -162,22 +181,64 @@ function buildGroundedContext(restaurant: RestaurantContext) {
   ].join("\n");
 }
 
-function buildGeminiPrompt(groundedContext: string, customerMessage: string) {
-  return [
-    "You are a friendly restaurant waiter helping a customer at their table.",
-    "Use only the grounded restaurant context from the database below.",
-    "The context includes restaurant information, menu items, allergens for each menu item, and active restaurant knowledge base records.",
-    "Answer simply, naturally, and briefly.",
-    "Do not invent menu items, prices, allergens, availability, ingredients, opening hours, or policies.",
-    "If the database context does not contain the answer, say that you do not have that information and offer to ask staff.",
-    "For allergy questions, summarize listed allergens but do not guarantee safety; recommend confirming with restaurant staff.",
-    "For payment, complaints, staff help, or sensitive allergy confirmation, explain that staff should assist.",
-    "",
-    "Grounded restaurant context:",
-    groundedContext,
-    "",
-    `Customer message: ${customerMessage}`,
-  ].join("\n");
+async function getConversationHistory(
+  sessionId: number,
+  currentCustomerMessageId: number,
+) {
+  const previousMessages = await prisma.chatMessage.findMany({
+    where: {
+      sessionId,
+      id: { lt: currentCustomerMessageId },
+    },
+    orderBy: { id: "desc" },
+    take: CONVERSATION_MEMORY_MESSAGE_LIMIT,
+  });
+
+  return formatConversationHistory(previousMessages.reverse());
+}
+
+async function getCustomerContext(sessionId: number) {
+  const session = await prisma.customerSession.findUnique({
+    where: { id: sessionId },
+    include: { table: true },
+  });
+
+  return buildCustomerContext({
+    tableNumber: session?.table.tableNumber,
+  });
+}
+
+function formatConversationHistory(
+  messages: Array<{ senderType: string; messageContent: string }>,
+) {
+  if (messages.length === 0) return "";
+
+  const lines = messages
+    .filter(({ senderType }) =>
+      ["customer", "ai", "staff"].includes(senderType),
+    )
+    .map(({ senderType, messageContent }) => {
+      const label =
+        senderType === "customer"
+          ? "Customer"
+          : senderType === "ai"
+            ? "Assistant"
+            : "Staff";
+
+      return `${label}: ${messageContent.trim()}`;
+    });
+
+  const maxLength = CONVERSATION_MEMORY_TOKEN_LIMIT * APPROX_CHARS_PER_TOKEN;
+  let history = lines.join("\n");
+
+  while (history.length > maxLength && lines.length > 1) {
+    lines.shift();
+    history = lines.join("\n");
+  }
+
+  if (history.length <= maxLength) return history;
+
+  return history.slice(history.length - maxLength).trimStart();
 }
 
 function buildFallbackGroundedContext() {

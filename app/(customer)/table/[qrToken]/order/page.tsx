@@ -100,7 +100,7 @@ export default function OrderPage() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-4 pb-28">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-4">
         <div className="w-full">
           {orders.map((order) => (
             <div key={order.id} className="mb-4 rounded-[20px] border border-[#d5e1ec] bg-white p-5">
@@ -153,12 +153,14 @@ export default function OrderPage() {
         </div>
       </div>
 
-      <Link
-        href={`${basePath}/chat`}
-        className="fixed bottom-[88px] left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#438ed8] px-5 py-2.5 text-sm font-medium text-white shadow-lg"
-      >
-        Ask AI
-      </Link>
+      <div className="shrink-0 border-t border-[#d5e1ec] bg-white px-4 py-3 text-center">
+        <Link
+          href={`${basePath}/chat`}
+          className="inline-flex rounded-full bg-[#438ed8] px-5 py-2.5 text-sm font-medium text-white shadow-sm"
+        >
+          Ask AI
+        </Link>
+      </div>
 
       <CustomerBottomNav activeTab="order" basePath={basePath} cartCount={cartCount > 0 ? cartCount : undefined} orderCount={1} />
     </CustomerMobileLayout>

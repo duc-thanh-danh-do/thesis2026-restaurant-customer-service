@@ -15,7 +15,7 @@ export default function CustomerChatInput({
   disabled: boolean;
 }) {
   return (
-    <form className="sticky bottom-20 flex gap-2" onSubmit={onSubmit}>
+    <form className="flex shrink-0 gap-2" onSubmit={onSubmit}>
       <input
         className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-3 py-3 text-sm outline-none focus:border-teal-700"
         disabled={disabled}
