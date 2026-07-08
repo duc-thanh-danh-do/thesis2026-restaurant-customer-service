@@ -101,7 +101,11 @@ export default function CustomerChat({ sessionToken }: { sessionToken: string })
       const response = await fetch("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionToken, message: trimmedMessage }),
+        body: JSON.stringify({
+          sessionToken,
+          legacySessionTokenOnly: true,
+          message: trimmedMessage,
+        }),
       });
 
       if (!response.ok) {

@@ -130,7 +130,22 @@ export default function CustomerTableChat({
 
   const sendMessage = async (content = message) => {
     const trimmedMessage = content.trim();
-    if (!trimmedMessage || !sessionToken || isAssistantTyping) return;
+    const tableQrToken = qrToken.trim();
+    if (!trimmedMessage || isAssistantTyping) return;
+
+    if (!tableQrToken) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: `assistant-error-${Date.now()}`,
+          sender: "assistant",
+          content:
+            "This table link is missing its QR token. Please scan the table QR code again.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
 
     const now = new Date();
     setMessages((current) => [
@@ -149,7 +164,11 @@ export default function CustomerTableChat({
       const response = await fetch("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionToken, message: trimmedMessage }),
+        body: JSON.stringify({
+          qrToken: tableQrToken,
+          sessionToken,
+          message: trimmedMessage,
+        }),
       });
 
       if (!response.ok) {
@@ -168,8 +187,14 @@ export default function CustomerTableChat({
 
       const payload = (await response.json()) as {
         reply: string;
+        sessionToken: string | null;
         aiMessage: { id: number; createdAt?: string | null };
       };
+
+      if (payload.sessionToken) {
+        window.localStorage.setItem("dining-session-token", payload.sessionToken);
+        setSessionToken(payload.sessionToken);
+      }
 
       setMessages((current) => [
         ...current,
@@ -304,7 +329,7 @@ export default function CustomerTableChat({
                 sendMessage("Which dishes are safe for my allergens?")
               }
               className="flex shrink-0 items-center gap-2 rounded-full border border-[#d5e1ec] bg-[#f5f9fc] px-3 py-2 text-sm"
-              disabled={!sessionToken || isAssistantTyping}
+              disabled={isAssistantTyping}
             >
               <Shield className="h-4 w-4 text-[#142653]" />
               Ask about allergens
@@ -312,7 +337,7 @@ export default function CustomerTableChat({
             <button
               onClick={() => sendMessage("Can I get water for the table?")}
               className="flex shrink-0 items-center gap-2 rounded-full border border-[#d5e1ec] bg-[#f5f9fc] px-3 py-2 text-sm"
-              disabled={!sessionToken || isAssistantTyping}
+              disabled={isAssistantTyping}
             >
               <Droplet className="h-4 w-4 text-[#142653]" />
               Ask for water
@@ -335,7 +360,7 @@ export default function CustomerTableChat({
             />
             <button
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#142653] disabled:bg-gray-300"
-              disabled={!message.trim() || !sessionToken || isAssistantTyping}
+              disabled={!message.trim() || isAssistantTyping}
             >
               <Send className="h-4 w-4 text-white" />
             </button>

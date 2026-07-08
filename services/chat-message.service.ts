@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger";
 import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
 import { generateAiText } from "@/services/ai-assistant.service";
+import { createCustomerSession } from "@/services/customer-session.service";
 
 const ACTIVE_SESSION_STATUSES = new Set(["active", "waiting_staff"]);
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -19,19 +20,23 @@ const CONVERSATION_MEMORY_MESSAGE_LIMIT = 10;
 const CONVERSATION_MEMORY_TOKEN_LIMIT = 1200;
 const APPROX_CHARS_PER_TOKEN = 4;
 
-export async function sendCustomerChatMessage(
-  sessionToken: string,
-  message: string,
-) {
+export async function sendCustomerChatMessage({
+  qrToken,
+  sessionToken,
+  allowSessionTokenOnly = false,
+  message,
+}: {
+  qrToken?: string;
+  sessionToken?: string | null;
+  allowSessionTokenOnly?: boolean;
+  message: string;
+}) {
   try {
-    const session = await prisma.customerSession.findUnique({
-      where: { sessionToken },
+    const session = await resolveActiveChatSession({
+      qrToken,
+      sessionToken,
+      allowSessionTokenOnly,
     });
-
-    if (!session) throw new HttpError("Session not found", "SESSION_NOT_FOUND", 404);
-    if (!ACTIVE_SESSION_STATUSES.has(session.status)) {
-      throw new HttpError("Session is not active", "SESSION_NOT_ACTIVE", 400);
-    }
 
     const customerMessage = await createChatMessage(
       session.id,
@@ -84,6 +89,7 @@ export async function sendCustomerChatMessage(
       reply,
       handoverRequired,
       requestId: null,
+      sessionToken: session.sessionToken,
       sessionStatus: session.status,
       aiMessage,
     };
@@ -104,6 +110,7 @@ export async function sendCustomerChatMessage(
       reply,
       handoverRequired,
       requestId: null,
+      sessionToken: sessionToken ?? null,
       sessionStatus: "active",
       aiMessage: {
         id: Date.now(),
@@ -115,6 +122,56 @@ export async function sendCustomerChatMessage(
       fallback: true,
     };
   }
+}
+
+async function resolveActiveChatSession({
+  qrToken,
+  sessionToken,
+  allowSessionTokenOnly,
+}: {
+  qrToken?: string;
+  sessionToken?: string | null;
+  allowSessionTokenOnly: boolean;
+}) {
+  if (qrToken) {
+    const table = await prisma.restaurantTable.findUnique({
+      where: { qrCodeToken: qrToken },
+    });
+
+    if (!table) throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
+    if (!table.isActive) throw new HttpError("Restaurant table is inactive", "TABLE_INACTIVE", 400);
+
+    const session = sessionToken
+      ? await prisma.customerSession.findFirst({
+          where: {
+            sessionToken,
+            tableId: table.id,
+            status: { in: Array.from(ACTIVE_SESSION_STATUSES) },
+          },
+        })
+      : null;
+
+    return session ?? (await createCustomerSession(qrToken)).session;
+  }
+
+  if (!allowSessionTokenOnly) {
+    throw new HttpError("QR token is required", "QR_TOKEN_REQUIRED", 400);
+  }
+
+  if (!sessionToken) {
+    throw new HttpError("Session token is required for legacy chat", "SESSION_TOKEN_REQUIRED", 400);
+  }
+
+  const session = await prisma.customerSession.findUnique({
+    where: { sessionToken },
+  });
+
+  if (!session) throw new HttpError("Session not found", "SESSION_NOT_FOUND", 404);
+  if (!ACTIVE_SESSION_STATUSES.has(session.status)) {
+    throw new HttpError("Session is not active", "SESSION_NOT_ACTIVE", 400);
+  }
+
+  return session;
 }
 
 type RestaurantContext = Prisma.RestaurantGetPayload<{

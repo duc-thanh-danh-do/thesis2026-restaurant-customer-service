@@ -7,7 +7,12 @@ export async function POST(request: Request) {
   try {
     const body = chatMessageSchema.parse(await request.json());
     return Response.json(
-      await sendCustomerChatMessage(body.sessionToken, body.message),
+      await sendCustomerChatMessage({
+        qrToken: body.qrToken,
+        sessionToken: body.sessionToken,
+        allowSessionTokenOnly: body.legacySessionTokenOnly,
+        message: body.message,
+      }),
     );
   } catch (error) {
     logger.error("Failed to send customer chat message", error);
