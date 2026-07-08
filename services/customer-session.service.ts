@@ -7,6 +7,7 @@ import {
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
 import {
+  findActiveSessionByTableId,
   findSessionByToken,
   findTableByQrToken,
 } from "@/repositories/customer-session.repository";
@@ -18,6 +19,18 @@ export async function createCustomerSession(qrCodeToken: string) {
     if (!table) throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
     if (!table.isActive) throw new HttpError("Restaurant table is inactive", "TABLE_INACTIVE", 400);
 
+    const existingSession = await findActiveSessionByTableId(table.id);
+    const { restaurant, ...tableResponse } = table;
+
+    if (existingSession) {
+      return {
+        sessionToken: existingSession.sessionToken,
+        session: existingSession,
+        restaurant,
+        table: tableResponse,
+      };
+    }
+
     const sessionToken = `sess_${randomUUID()}`;
     const session = await prisma.customerSession.create({
       data: {
@@ -28,8 +41,6 @@ export async function createCustomerSession(qrCodeToken: string) {
         startedAt: new Date(),
       },
     });
-
-    const { restaurant, ...tableResponse } = table;
 
     return {
       sessionToken,
