@@ -8,6 +8,7 @@ import {
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
 import { buildCustomerContext, buildGeminiPrompt } from "@/lib/ai/chat-prompt";
+import { logger } from "@/lib/logger";
 import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
 import { generateAiText } from "@/services/ai-assistant.service";
@@ -55,7 +56,12 @@ export async function sendCustomerChatMessage(
       conversationHistory,
       customerMessage: message,
     });
-    const reply = normalizeReply(await generateAiText(prompt));
+    const reply = await generateReplyWithFallback({
+      restaurant,
+      groundedContext,
+      message,
+      prompt,
+    });
     const handoverRequired = requiresStaffHandover(message);
 
     const aiMessage = await createChatMessage(session.id, "ai", reply);
@@ -141,8 +147,6 @@ function buildGroundedContext(restaurant: RestaurantContext) {
               `  Category: ${item.category ?? "Not available"}`,
               `  Price: ${item.price.toString()}`,
               `  Available: ${item.isAvailable ? "yes" : "no"}`,
-              // `  Vegetarian: ${item.isVegetarian ? "yes" : "no"}`,
-              // `  Vegan: ${item.isVegan ? "yes" : "no"}`,
               `  Dietary tags: ${item.dietary ?? "None"}`,
               `  Ingredients: ${item.ingredients ?? "Not available"}`,
               `  Allergens: ${allergens || "None listed"}`,
@@ -248,8 +252,7 @@ function buildFallbackGroundedContext() {
         `  Category: ${item.category ?? "Not available"}`,
         `  Price: ${item.price.toFixed(2)}`,
         `  Available: ${item.isAvailable ? "yes" : "no"}`,
-        // `  Vegetarian: ${item.isVegetarian ? "yes" : "no"}`,
-        // `  Vegan: ${item.isVegan ? "yes" : "no"}`,
+        `  Dietary tags: ${item.dietary ?? "None"}`,
         `  Ingredients: ${item.ingredients ?? "Not available"}`,
         `  Allergens: ${allergens || "None listed"}`,
       ].join("\n");
@@ -279,13 +282,86 @@ function buildFallbackGroundedContext() {
   ].join("\n");
 }
 
+async function generateReplyWithFallback({
+  restaurant,
+  groundedContext,
+  message,
+  prompt,
+}: {
+  restaurant: RestaurantContext;
+  groundedContext: string;
+  message: string;
+  prompt: string;
+}) {
+  try {
+    return normalizeReply(await generateAiText(prompt));
+  } catch (error) {
+    logger.error("Gemini failed for customer chat message", error);
+    return buildDatabaseFallbackReply(restaurant, message, groundedContext);
+  }
+}
+
+function buildDatabaseFallbackReply(
+  restaurant: RestaurantContext,
+  message: string,
+  groundedContext: string,
+) {
+  const matchedItem = findMentionedMenuItem(restaurant, message);
+
+  if (matchedItem) {
+    const allergens = getAllergenNames(matchedItem);
+    const hasAllergyConcern = /allerg|fish|gluten|soy|milk|dairy|egg|nut|peanut|shellfish|sesame/i.test(
+      message,
+    );
+
+    if (hasAllergyConcern) {
+      return [
+        `I could not reach Gemini right now, but from the restaurant database: ${matchedItem.name} lists ${formatAllergenList(allergens)} as allergens.`,
+        "Please confirm with restaurant staff before ordering, especially for allergies.",
+      ].join(" ");
+    }
+
+    return [
+      `I could not reach Gemini right now, but from the restaurant database: ${matchedItem.name} is ${matchedItem.isAvailable ? "available" : "not available"}.`,
+      `Allergens listed: ${formatAllergenList(allergens)}.`,
+    ].join(" ");
+  }
+
+  if (groundedContext.trim()) {
+    return "I could not reach Gemini right now, but I can still use the restaurant database. Please ask again with the dish name, or ask restaurant staff for help.";
+  }
+
+  return "I could not reach Gemini right now. Please ask restaurant staff for help.";
+}
+
+function findMentionedMenuItem(restaurant: RestaurantContext, message: string) {
+  const normalizedMessage = normalizeSearchText(message);
+
+  return restaurant.menuItems.find((item) => {
+    const normalizedName = normalizeSearchText(item.name);
+    return normalizedMessage.includes(normalizedName);
+  });
+}
+
+function getAllergenNames(item: RestaurantContext["menuItems"][number]) {
+  return item.menuItemAllergens.map(({ allergen }) => allergen.name);
+}
+
+function formatAllergenList(allergens: string[]) {
+  return allergens.length > 0 ? allergens.join(", ") : "none";
+}
+
+function normalizeSearchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 function normalizeReply(reply: string) {
   const trimmedReply = reply.trim();
   return trimmedReply || "I do not have enough information in the provided restaurant data to answer that.";
 }
 
 function requiresStaffHandover(message: string) {
-  return /\b(allerg|bill|pay|payment|complaint|manager|staff|help)\b/i.test(
+  return /\b(allerg\w*|bill|pay|payment|complaint|manager|staff|help)\b/i.test(
     message,
   );
 }

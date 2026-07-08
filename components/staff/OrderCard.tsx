@@ -22,6 +22,7 @@ interface OrderCardProps {
   time: string;
   initialStatus: string;
   items: OrderItem[];
+  onRefresh?: () => void; //Receiving updates
 }
 
 export default function OrderCard({
@@ -29,6 +30,7 @@ export default function OrderCard({
   time,
   initialStatus,
   items,
+  onRefresh,
 }: OrderCardProps) {
   const [optimisticStatus, setOptimisticStatus] = useState(initialStatus);
   const [optimisticItems, setOptimisticItems] = useState(items);
@@ -52,7 +54,7 @@ export default function OrderCard({
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
         <div className="flex items-center justify-between">
           <span className="font-medium text-slate-700">
-            {id} · {time}
+            {time}
           </span>
           <span className="font-semibold text-slate-800">
             €{optimisticTotal.toFixed(2)}
@@ -63,8 +65,8 @@ export default function OrderCard({
       {/* Progress Section */}
       <div className="px-4 py-4 border-b border-slate-100">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-medium text-slate-400 uppercase">
-            Progress
+          <span className="text-xs font-medium text-slate-400">
+            PROGRESS
           </span>
           <span className="text-sm font-medium text-slate-700">
             {optimisticStatus}
@@ -81,7 +83,10 @@ export default function OrderCard({
                 startTransition(async () => {
                   setOptimisticStatus(step);
                   const numericId = parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                  await updateOrderStatus(numericId, step);
+                  const result = await updateOrderStatus(numericId, step);
+                  if (result.success && onRefresh) {
+                    onRefresh();
+                  }
                 });
               }}
               className="flex-1 flex items-center group cursor-pointer border-none bg-transparent p-0 text-left"
@@ -158,11 +163,14 @@ export default function OrderCard({
                       startTransition(async () => {
                         const numericOrderId =
                           parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        await updateItemQuantityAction(
+                        const result = await updateItemQuantityAction(
                           numericOrderId,
                           item.id,
                           newQuantity
                         );
+                        if (result.success && onRefresh) {
+                          onRefresh();
+                        }
                       });
                     }}
                     className="h-6 w-6 rounded-full border-slate-300"
@@ -192,11 +200,14 @@ export default function OrderCard({
                       startTransition(async () => {
                         const numericOrderId =
                           parseInt(id.replace(/[^0-9]/g, "")) || 1;
-                        await updateItemQuantityAction(
+                        const result = await updateItemQuantityAction(
                           numericOrderId,
                           item.id,
                           newQuantity
                         );
+                        if (result.success && onRefresh) {
+                          onRefresh();
+                        }
                       });
                     }}
                     className="h-6 w-6 rounded-full border-slate-300"

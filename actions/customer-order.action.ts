@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { revalidatePath } from "next/cache";
 
 type OrderItemRow = {
@@ -22,22 +23,72 @@ export async function updateOrderStatus(orderId: number, status: string) {
 
     return { success: true };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error(" Failed to update order status:", error);
     return { success: false, error: "Database update failed" };
   }
 }
 
-export async function getTestOrder() {
+// export async function getTestOrder() {
+//   try {
+//     const order = await prisma.order.findFirst({
+//       include: { orderItems: true },
+//     });
+
+//     if (!order) return null;
+
+//     return {
+//       id: order.id.toString(),
+//       time: "Just now",
+//       total: Number(order.total),
+//       status: order.status,
+//       items: order.orderItems.map((item: OrderItemRow) => ({
+//         id: item.id,
+//         name: item.name,
+//         price: Number(item.price),
+//         quantity: item.quantity,
+//       })),
+//     };
+//   } catch (error) {
+//     console.error("Failed to fetch test order:", error);
+//     return null;
+//   }
+// }
+
+export async function getTableOrderAction(tableNumber: string) {
   try {
     const order = await prisma.order.findFirst({
-      include: { orderItems: true },
+      where: {
+        session: {
+          table: {
+            tableNumber: tableNumber,
+          },
+        },
+        status: {
+          notIn: ["Served", "Paid", "Cancelled"],
+        },
+      },
+      include: {
+        orderItems: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
     if (!order) return null;
 
     return {
       id: order.id.toString(),
-      time: "Just now",
+      time: order.createdAt
+        ? new Date(order.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Just now",
       total: Number(order.total),
       status: order.status,
       items: order.orderItems.map((item: OrderItemRow) => ({
@@ -48,7 +99,7 @@ export async function getTestOrder() {
       })),
     };
   } catch (error) {
-    console.error("Failed to fetch test order:", error);
+    console.error(`Failed to fetch order for table ${tableNumber}:`, error);
     return null;
   }
 }
@@ -85,7 +136,46 @@ export async function updateItemQuantityAction(
     revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return { success: false, error: "Database is unavailable. Please try again later." };
+    }
+
     console.error("Failed to update quantity:", error);
     return { success: false, error: "Failed to update item" };
+  }
+}
+
+export async function getActiveOrdersAction() {
+  try {
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        status: {
+          notIn: ["Served", "Paid", "Cancelled"],
+        },
+      },
+      include: {
+        session: {
+          include: {
+            table: true,
+          },
+        },
+        orderItems: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    return activeOrders.map((order) => ({
+      ...order,
+      total: Number(order.total),
+      orderItems: order.orderItems.map((item) => ({
+        ...item,
+        price: Number(item.price),
+      })),
+    }));
+  } catch (error) {
+    console.error("Failed to fetch active orders:", error);
+    return [];
   }
 }

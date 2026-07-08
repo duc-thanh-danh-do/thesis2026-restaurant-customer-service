@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 export type MenuItemFilters = {
   category?: string;
   isAvailable?: boolean;
-  // isVegetarian?: boolean;
   dietary?: string;
 };
 
@@ -15,11 +14,7 @@ export async function findMenuItems(
   const where: Prisma.MenuItemWhereInput = { restaurantId };
 
   if (filters.category) where.category = filters.category;
-  if (filters.isAvailable !== undefined)
-    where.isAvailable = filters.isAvailable;
-  // if (filters.isVegetarian !== undefined) {
-  //   where.isVegetarian = filters.isVegetarian;
-  // }
+  if (filters.isAvailable !== undefined) where.isAvailable = filters.isAvailable;
   if (filters.dietary) {
     where.dietary = {
       contains: filters.dietary,

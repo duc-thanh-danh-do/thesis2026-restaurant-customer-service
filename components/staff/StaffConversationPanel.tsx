@@ -1,11 +1,17 @@
-import StaffReplyBox from "@/components/staff/StaffReplyBox";
+"use client";
 
-export default function StaffConversationPanel({ sessionId }: { sessionId: string }) {
-  return (
-    <section className="surface p-4">
-      <h1 className="text-xl font-bold">Session {sessionId}</h1>
-      <div className="mt-4 rounded-md bg-neutral-100 p-3 text-sm">Customer conversation view.</div>
-      <StaffReplyBox />
-    </section>
-  );
+import DashboardConversationPanel from "@/components/staff/DashboardConversationPanel";
+import SessionConversationPanel from "@/components/staff/SessionConversationPanel";
+import type { StaffSessionDetail } from "@/lib/staff-page-data";
+
+type StaffConversationPanelProps =
+  | { session: StaffSessionDetail; tableId?: never }
+  | { tableId: string | null; session?: never };
+
+export default function StaffConversationPanel(props: StaffConversationPanelProps) {
+  if (props.session) {
+    return <SessionConversationPanel session={props.session} />;
+  }
+
+  return <DashboardConversationPanel tableId={props.tableId} />;
 }
