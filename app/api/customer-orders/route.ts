@@ -10,16 +10,27 @@ export async function GET(request: Request) {
     const qrToken = searchParams.get("qrToken");
     const sessionToken = searchParams.get("sessionToken");
 
-    if (!qrToken) throw new HttpError("QR token is required", "QR_TOKEN_REQUIRED", 400);
+    if (!qrToken)
+      throw new HttpError("QR token is required", "QR_TOKEN_REQUIRED", 400);
 
     const table = await prisma.restaurantTable.findUnique({
       where: { qrCodeToken: qrToken },
     });
 
-    if (!table) throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
+    if (!table)
+      throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
+
+    const responseInit = {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    };
 
     if (!sessionToken) {
-      return Response.json({ tableNumber: table.tableNumber, orders: [] });
+      return Response.json(
+        { tableNumber: table.tableNumber, orders: [] },
+        responseInit,
+      );
     }
 
     const session = await prisma.customerSession.findFirst({
@@ -41,25 +52,31 @@ export async function GET(request: Request) {
     });
 
     if (!session) {
-      return Response.json({ tableNumber: table.tableNumber, orders: [] });
+      return Response.json(
+        { tableNumber: table.tableNumber, orders: [] },
+        responseInit,
+      );
     }
 
-    return Response.json({
-      tableNumber: table.tableNumber,
-      orders: session.orders.map((order) => ({
-        id: order.id,
-        status: order.status,
-        total: Number(order.total),
-        createdAt: order.createdAt,
+    return Response.json(
+      {
         tableNumber: table.tableNumber,
-        items: order.orderItems.map((item) => ({
-          id: item.id,
-          name: item.name,
-          price: Number(item.price),
-          quantity: item.quantity,
+        orders: session.orders.map((order) => ({
+          id: order.id,
+          status: order.status,
+          total: Number(order.total),
+          createdAt: order.createdAt,
+          tableNumber: table.tableNumber,
+          items: order.orderItems.map((item) => ({
+            id: item.id,
+            name: item.name,
+            price: Number(item.price),
+            quantity: item.quantity,
+          })),
         })),
-      })),
-    });
+      },
+      responseInit,
+    );
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -73,14 +90,21 @@ export async function POST(request: Request) {
       items?: Record<string, number>;
     };
 
-    if (!body.qrToken) throw new HttpError("QR token is required", "QR_TOKEN_REQUIRED", 400);
-    if (!body.items) throw new HttpError("Order items are required", "ORDER_ITEMS_REQUIRED", 400);
+    if (!body.qrToken)
+      throw new HttpError("QR token is required", "QR_TOKEN_REQUIRED", 400);
+    if (!body.items)
+      throw new HttpError(
+        "Order items are required",
+        "ORDER_ITEMS_REQUIRED",
+        400,
+      );
 
     const table = await prisma.restaurantTable.findUnique({
       where: { qrCodeToken: body.qrToken },
     });
 
-    if (!table) throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
+    if (!table)
+      throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
 
     const requestedItems = Object.entries(body.items)
       .map(([itemId, quantity]) => ({
@@ -107,19 +131,22 @@ export async function POST(request: Request) {
     });
 
     if (menuItems.length === 0) {
-      throw new HttpError("Order has no available menu items", "ORDER_EMPTY", 400);
+      throw new HttpError(
+        "Order has no available menu items",
+        "ORDER_EMPTY",
+        400,
+      );
     }
 
-    const session =
-      body.sessionToken
-        ? await prisma.customerSession.findFirst({
-            where: {
-              sessionToken: body.sessionToken,
-              tableId: table.id,
-              status: { in: ACTIVE_SESSION_STATUSES },
-            },
-          })
-        : null;
+    const session = body.sessionToken
+      ? await prisma.customerSession.findFirst({
+          where: {
+            sessionToken: body.sessionToken,
+            tableId: table.id,
+            status: { in: ACTIVE_SESSION_STATUSES },
+          },
+        })
+      : null;
 
     const activeSession =
       session ??
@@ -133,16 +160,20 @@ export async function POST(request: Request) {
         },
       }));
 
-    const orderItems = menuItems.map((menuItem) => {
-      const requestedItem = requestedItems.find((item) => item.id === menuItem.id);
-      const quantity = requestedItem?.quantity ?? 0;
+    const orderItems = menuItems
+      .map((menuItem) => {
+        const requestedItem = requestedItems.find(
+          (item) => item.id === menuItem.id,
+        );
+        const quantity = requestedItem?.quantity ?? 0;
 
-      return {
-        name: menuItem.name,
-        price: Number(menuItem.price),
-        quantity,
-      };
-    }).filter((item) => item.quantity > 0);
+        return {
+          name: menuItem.name,
+          price: Number(menuItem.price),
+          quantity,
+        };
+      })
+      .filter((item) => item.quantity > 0);
 
     const total = orderItems.reduce(
       (sum, item) => sum + item.price * item.quantity,

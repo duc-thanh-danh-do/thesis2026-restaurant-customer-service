@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import ActiveTableCard, { type ActiveTableBadge, type ActiveTableSummary } from "@/components/staff/ActiveTableCard";
+import ActiveTableCard, {
+  type ActiveTableBadge,
+  type ActiveTableSummary,
+} from "@/components/staff/ActiveTableCard";
 import StaffConversationPanel from "@/components/staff/StaffConversationPanel";
 
 import { getActiveOrdersAction } from "@/actions/customer-order.action";
@@ -35,9 +38,40 @@ type DashboardRequest = {
   } | null;
 };
 
+type DashboardCache = {
+  activeTables: ActiveTableSummary[];
+  selectedTableId: string | null;
+  storedAt: number;
+};
+
+let dashboardCache: DashboardCache | null = null;
+const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readDashboardCache() {
+  if (!dashboardCache) return null;
+
+  if (Date.now() - dashboardCache.storedAt > DASHBOARD_CACHE_TTL_MS) {
+    dashboardCache = null;
+    return null;
+  }
+
+  return dashboardCache;
+}
+
+function formatStatus(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 export default function StaffWorkSpace() {
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [activeTables, setActiveTables] = useState<ActiveTableSummary[]>([]);
+  const initialCache = readDashboardCache();
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(
+    initialCache?.selectedTableId ?? null,
+  );
+  const [activeTables, setActiveTables] = useState<ActiveTableSummary[]>(
+    initialCache?.activeTables ?? [],
+  );
 
   const fetchDashboardData = useCallback(async () => {
     const [rawTables, rawOrders, rawRequests] = await Promise.all([
@@ -52,10 +86,10 @@ export default function StaffWorkSpace() {
 
     const formattedTables = tables.map((t) => {
       const tableOrders = orders.filter(
-        (o) => o.session?.table?.tableNumber === t.tableNumber
+        (o) => o.session?.table?.tableNumber === t.tableNumber,
       );
       const tableRequests = requests.filter(
-        (req) => req.session?.table?.tableNumber === t.tableNumber
+        (req) => req.session?.table?.tableNumber === t.tableNumber,
       );
 
       let hasWarning = false;
@@ -65,26 +99,46 @@ export default function StaffWorkSpace() {
 
       let oldestPendingTime = Infinity;
 
-      tableOrders.forEach((order) => {
-        if (!latestTime && order.createdAt)
-          latestTime = new Date(order.createdAt).toLocaleTimeString([], {
+      const latestOrder = tableOrders.reduce<DashboardOrder | null>(
+        (currentLatest, order) => {
+          if (!currentLatest) return order;
+
+          const currentLatestTime = currentLatest.createdAt
+            ? new Date(currentLatest.createdAt).getTime()
+            : 0;
+          const nextOrderTime = order.createdAt
+            ? new Date(order.createdAt).getTime()
+            : 0;
+
+          return nextOrderTime > currentLatestTime ? order : currentLatest;
+        },
+        null,
+      );
+
+      if (latestOrder) {
+        if (latestOrder.createdAt) {
+          latestTime = new Date(latestOrder.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           });
-        if (order.status === "Placed") {
+        }
+
+        const displayStatus = formatStatus(latestOrder.status);
+        const isPlaced = displayStatus.toLowerCase() === "placed";
+
+        badges.push({
+          text: `Order: ${displayStatus}`,
+          color: isPlaced ? "bg-amber-500" : "bg-slate-500",
+        });
+
+        if (isPlaced) {
           hasWarning = true;
-          badges.push({ text: "Order: Placed", color: "bg-amber-500" });
-          if (order.createdAt) {
-            const tTime = new Date(order.createdAt).getTime();
+          if (latestOrder.createdAt) {
+            const tTime = new Date(latestOrder.createdAt).getTime();
             if (tTime < oldestPendingTime) oldestPendingTime = tTime;
           }
-        } else {
-          badges.push({
-            text: `Order: ${order.status}`,
-            color: "bg-slate-500",
-          });
         }
-      });
+      }
 
       tableRequests.forEach((req) => {
         if (!latestTime && req.createdAt)
@@ -123,8 +177,20 @@ export default function StaffWorkSpace() {
     });
 
     setActiveTables(formattedTables);
-    if (formattedTables.length > 0 && !selectedTableId)
-      setSelectedTableId(formattedTables[0].id);
+    const nextSelectedTableId =
+      selectedTableId &&
+      formattedTables.some((table) => table.id === selectedTableId)
+        ? selectedTableId
+        : (formattedTables[0]?.id ?? null);
+
+    dashboardCache = {
+      activeTables: formattedTables,
+      selectedTableId: nextSelectedTableId,
+      storedAt: Date.now(),
+    };
+
+    if (nextSelectedTableId !== selectedTableId)
+      setSelectedTableId(nextSelectedTableId);
   }, [selectedTableId]);
 
   useEffect(() => {
@@ -132,10 +198,14 @@ export default function StaffWorkSpace() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  const handleSelectTable = (tableId: string) => {
+    setSelectedTableId(tableId);
+  };
+
   return (
-    <div className="flex h-[calc(100dvh-73px)] flex-col bg-slate-100 xl:flex-row overflow-hidden">
+    <div className="flex h-[calc(100dvh-73px)] flex-col overflow-hidden bg-slate-100 xl:flex-row">
       {/* ActiveTableCard */}
-      <div className="flex max-h-[420px] w-full flex-col bg-[#13275a] xl:max-h-none xl:w-[320px] flex-shrink-0">
+      <div className="flex max-h-105 w-full shrink-0 flex-col bg-[#13275a] xl:max-h-none xl:w-[320px]">
         <div className="p-5">
           <p className="text-xs font-medium text-blue-300 uppercase tracking-wide">
             Staff Dashboard
@@ -151,7 +221,7 @@ export default function StaffWorkSpace() {
                 key={table.id}
                 table={table}
                 isSelected={selectedTableId === table.id}
-                onClick={() => setSelectedTableId(table.id)}
+                onClick={() => handleSelectTable(table.id)}
               />
             ))}
           </div>
@@ -165,7 +235,7 @@ export default function StaffWorkSpace() {
         </div>
 
         {/* detailsPanel */}
-        <div className="w-full h-full overflow-hidden lg:w-[280px] xl:w-[320px] flex-shrink-0 bg-slate-50/50">
+        <div className="h-full w-full shrink-0 overflow-hidden bg-slate-50/50 lg:w-70 xl:w-[320px]">
           <TableDetailsPanel
             tableId={selectedTableId}
             onDataChange={fetchDashboardData}
