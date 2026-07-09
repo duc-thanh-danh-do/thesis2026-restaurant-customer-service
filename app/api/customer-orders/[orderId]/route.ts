@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { HttpError, toErrorResponse } from "@/lib/http-errors";
+import { confirmOrder, serializeOrderDraft } from "@/services/customer-order.service";
 
 export async function GET(
   _request: Request,
@@ -43,6 +44,29 @@ export async function GET(
           quantity: item.quantity,
         })),
       },
+    });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ orderId: string }> },
+) {
+  try {
+    const { orderId } = await params;
+    const parsedOrderId = Number(orderId);
+    const body = (await request.json()) as { action?: string };
+
+    if (body.action !== "confirm") {
+      throw new HttpError("Unsupported order action", "UNSUPPORTED_ORDER_ACTION", 400);
+    }
+
+    const order = await confirmOrder(parsedOrderId);
+
+    return Response.json({
+      order: serializeOrderDraft(order),
     });
   } catch (error) {
     return toErrorResponse(error);

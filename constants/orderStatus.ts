@@ -9,6 +9,7 @@ export const ORDER_STATUS = [
 export type OrderStatus = (typeof ORDER_STATUS)[number];
 
 export const CUSTOMER_DRAFT_ORDER_STATUS = "unconfirmed" satisfies OrderStatus;
+export const CUSTOMER_CONFIRMED_ORDER_STATUS = "placed" satisfies OrderStatus;
 export const STAFF_VISIBLE_ORDER_STATUSES = [
   "placed",
   "preparing",

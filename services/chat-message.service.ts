@@ -13,6 +13,10 @@ import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
 import { generateAiText } from "@/services/ai-assistant.service";
 import { createCustomerSession } from "@/services/customer-session.service";
+import {
+  createUnconfirmedOrder,
+  serializeOrderDraft,
+} from "@/services/customer-order.service";
 
 const ACTIVE_SESSION_STATUSES = new Set(["active", "waiting_staff"]);
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -68,8 +72,22 @@ export async function sendCustomerChatMessage({
       prompt,
     });
     const handoverRequired = requiresStaffHandover(message);
+    const orderToolResult = qrToken
+      ? await maybeCreateOrderDraft({
+          qrToken,
+          sessionId: session.id,
+          sessionToken: session.sessionToken,
+          message,
+          restaurant,
+        })
+      : null;
+    const finalReply = orderToolResult
+      ? buildOrderDraftReply(orderToolResult)
+      : shouldHandleAsOrderRequest(message)
+        ? buildUnresolvedOrderReply()
+        : reply;
 
-    const aiMessage = await createChatMessage(session.id, "ai", reply);
+    const aiMessage = await createChatMessage(session.id, "ai", finalReply);
 
     await prisma.aiResponseLog.create({
       data: {
@@ -79,19 +97,20 @@ export async function sendCustomerChatMessage({
         modelName: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
         retrievedContext: groundedContext,
         prompt,
-        response: reply,
+        response: finalReply,
         handoverRequired,
         createdAt: new Date(),
       },
     });
 
     return {
-      reply,
+      reply: finalReply,
       handoverRequired,
       requestId: null,
       sessionToken: session.sessionToken,
       sessionStatus: session.status,
       aiMessage,
+      orderDraft: orderToolResult?.orderDraft ?? null,
     };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
@@ -119,6 +138,7 @@ export async function sendCustomerChatMessage({
         messageContent: reply,
         createdAt: new Date(),
       },
+      orderDraft: null,
       fallback: true,
     };
   }
@@ -415,6 +435,163 @@ function normalizeSearchText(value: string) {
 function normalizeReply(reply: string) {
   const trimmedReply = reply.trim();
   return trimmedReply || "I do not have enough information in the provided restaurant data to answer that.";
+}
+
+async function maybeCreateOrderDraft({
+  qrToken,
+  sessionId,
+  sessionToken,
+  message,
+  restaurant,
+}: {
+  qrToken: string;
+  sessionId: number;
+  sessionToken: string;
+  message: string;
+  restaurant: RestaurantContext;
+}) {
+  const orderRequest = await extractOrderRequest({
+    sessionId,
+    restaurant,
+    message,
+  });
+  if (!orderRequest) return null;
+
+  const result = await createUnconfirmedOrder({
+    qrToken,
+    sessionToken,
+    items: {
+      [String(orderRequest.menuItemId)]: orderRequest.quantity,
+    },
+  });
+
+  return {
+    itemName: orderRequest.name,
+    quantity: orderRequest.quantity,
+    orderDraft: serializeOrderDraft(result.order),
+  };
+}
+
+async function extractOrderRequest({
+  sessionId,
+  restaurant,
+  message,
+}: {
+  sessionId: number;
+  restaurant: RestaurantContext;
+  message: string;
+}) {
+  const normalizedMessage = normalizeSearchText(message);
+  const matchedItem = restaurant.menuItems.find((item) => {
+    if (!item.isAvailable) return false;
+
+    return normalizedMessage.includes(normalizeSearchText(item.name));
+  });
+
+  if (matchedItem && shouldHandleAsOrderRequest(message)) {
+    return {
+      menuItemId: matchedItem.id,
+      name: matchedItem.name,
+      quantity: extractQuantity(message),
+    };
+  }
+
+  if (!isRepeatOrderRequest(message)) return null;
+
+  const latestDraftItem = await findLatestDraftOrderItem(sessionId);
+  if (!latestDraftItem) return null;
+
+  const repeatedMenuItem = restaurant.menuItems.find(
+    (item) =>
+      item.isAvailable &&
+      normalizeSearchText(item.name) === normalizeSearchText(latestDraftItem.name),
+  );
+
+  if (!repeatedMenuItem) return null;
+
+  return {
+    menuItemId: repeatedMenuItem.id,
+    name: repeatedMenuItem.name,
+    quantity: extractQuantity(message),
+  };
+}
+
+async function findLatestDraftOrderItem(sessionId: number) {
+  const latestDraft = await prisma.order.findFirst({
+    where: {
+      sessionId,
+      status: "unconfirmed",
+    },
+    include: {
+      orderItems: {
+        orderBy: { id: "desc" },
+        take: 1,
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return latestDraft?.orderItems[0] ?? null;
+}
+
+function shouldHandleAsOrderRequest(message: string) {
+  return hasExplicitOrderIntent(message) || hasAdditiveOrderIntent(message);
+}
+
+function hasExplicitOrderIntent(message: string) {
+  return /\b(add|order|get|want|take|bring|can i get|can i have|i'll have|i would like|i want)\b/i.test(
+    message,
+  );
+}
+
+function hasAdditiveOrderIntent(message: string) {
+  return /^(and|also|plus)\b/i.test(message) || isRepeatOrderRequest(message);
+}
+
+function isRepeatOrderRequest(message: string) {
+  return /\b(one more|another|same|more please|one more please|add one more)\b/i.test(
+    message,
+  );
+}
+
+function extractQuantity(message: string) {
+  const numericQuantity = message.match(/\b([1-9]\d*)\b/);
+  if (numericQuantity) return Number(numericQuantity[1]);
+
+  const quantityWords: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+  };
+  const normalizedMessage = normalizeSearchText(message);
+  const matchedWord = Object.entries(quantityWords).find(([word]) =>
+    normalizedMessage.split(" ").includes(word),
+  );
+
+  return matchedWord?.[1] ?? 1;
+}
+
+function buildOrderDraftReply({
+  itemName,
+  quantity,
+}: {
+  itemName: string;
+  quantity: number;
+}) {
+  return `I added ${quantity}x ${itemName} to your order draft. Please review and confirm it before we send it to the restaurant.`;
+}
+
+function buildUnresolvedOrderReply() {
+  return "I could not add that to your order draft yet. Please include the exact dish name from the menu, and I will prepare it for you to review.";
 }
 
 function requiresStaffHandover(message: string) {

@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { HttpError } from "@/lib/http-errors";
 import { createCustomerSession } from "@/services/customer-session.service";
-import { CUSTOMER_DRAFT_ORDER_STATUS } from "@/constants/orderStatus";
+import {
+  CUSTOMER_CONFIRMED_ORDER_STATUS,
+  CUSTOMER_DRAFT_ORDER_STATUS,
+} from "@/constants/orderStatus";
 
 const ACTIVE_SESSION_STATUSES = ["active", "waiting_staff"] as const;
 
@@ -10,6 +13,34 @@ export type CreateUnconfirmedOrderInput = {
   sessionToken?: string | null;
   items: Record<string, number>;
 };
+
+type OrderWithItems = Awaited<ReturnType<typeof getOrderWithItems>>;
+
+function getOrderWithItems(orderId: number) {
+  return prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      orderItems: {
+        orderBy: { id: "asc" },
+      },
+    },
+  });
+}
+
+export function serializeOrderDraft(order: NonNullable<OrderWithItems>) {
+  return {
+    id: order.id,
+    status: order.status,
+    total: Number(order.total),
+    createdAt: order.createdAt,
+    items: order.orderItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      price: Number(item.price),
+      quantity: item.quantity,
+    })),
+  };
+}
 
 export async function createUnconfirmedOrder({
   qrToken,
@@ -83,6 +114,66 @@ export async function createUnconfirmedOrder({
     0,
   );
 
+  const existingDraft = await prisma.order.findFirst({
+    where: {
+      sessionId: activeSession.id,
+      status: CUSTOMER_DRAFT_ORDER_STATUS,
+    },
+    include: {
+      orderItems: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (existingDraft) {
+    for (const item of orderItems) {
+      const existingItem = existingDraft.orderItems.find(
+        (orderItem) => orderItem.name === item.name,
+      );
+
+      if (existingItem) {
+        await prisma.orderItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: existingItem.quantity + item.quantity },
+        });
+      } else {
+        await prisma.orderItem.create({
+          data: {
+            orderId: existingDraft.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+          },
+        });
+      }
+    }
+
+    const updatedItems = await prisma.orderItem.findMany({
+      where: { orderId: existingDraft.id },
+    });
+    const updatedTotal = updatedItems.reduce(
+      (sum, item) => sum + Number(item.price) * item.quantity,
+      0,
+    );
+
+    const updatedDraft = await prisma.order.update({
+      where: { id: existingDraft.id },
+      data: { total: updatedTotal },
+      include: {
+        orderItems: {
+          orderBy: { id: "asc" },
+        },
+      },
+    });
+
+    return {
+      order: updatedDraft,
+      sessionToken: activeSession.sessionToken,
+    };
+  }
+
   const order = await prisma.order.create({
     data: {
       sessionId: activeSession.id,
@@ -101,4 +192,27 @@ export async function createUnconfirmedOrder({
     order,
     sessionToken: activeSession.sessionToken,
   };
+}
+
+export async function confirmOrder(orderId: number) {
+  if (!Number.isInteger(orderId)) {
+    throw new HttpError("Invalid order id", "INVALID_ORDER_ID", 400);
+  }
+
+  const order = await getOrderWithItems(orderId);
+
+  if (!order) throw new HttpError("Order not found", "ORDER_NOT_FOUND", 404);
+  if (order.status !== CUSTOMER_DRAFT_ORDER_STATUS) {
+    throw new HttpError("Only unconfirmed orders can be confirmed", "ORDER_NOT_UNCONFIRMED", 400);
+  }
+
+  return prisma.order.update({
+    where: { id: orderId },
+    data: { status: CUSTOMER_CONFIRMED_ORDER_STATUS },
+    include: {
+      orderItems: {
+        orderBy: { id: "asc" },
+      },
+    },
+  });
 }
