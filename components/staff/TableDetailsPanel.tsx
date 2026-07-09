@@ -50,7 +50,7 @@ export default function TableDetailsPanel({
             />
           ) : (
             <div className="text-sm text-slate-400 p-4 border border-dashed border-slate-200 rounded-lg text-center">
-              No acitve order yet
+              No active order yet
             </div>
           )}
         </div>
