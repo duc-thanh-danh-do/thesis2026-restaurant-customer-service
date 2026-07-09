@@ -48,6 +48,7 @@ export default function StaffReplyBox({ onSendMessage }: StaffReplyBoxProps) {
           disabled={isPending}
           size="icon"
           type="submit"
+          aria-label="Send reply"
         >
           <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </Button>
