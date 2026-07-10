@@ -7,7 +7,7 @@ import {
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
 import {
-  findActiveSessionByTableId,
+  findActiveDiningSessionByTableId,
   findSessionByToken,
   findTableByQrToken,
 } from "@/repositories/customer-session.repository";
@@ -19,21 +19,22 @@ export async function createCustomerSession(qrCodeToken: string) {
     if (!table) throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
     if (!table.isActive) throw new HttpError("Restaurant table is inactive", "TABLE_INACTIVE", 400);
 
-    const existingSession = await findActiveSessionByTableId(table.id);
     const { restaurant, ...tableResponse } = table;
-
-    if (existingSession) {
-      return {
-        sessionToken: existingSession.sessionToken,
-        session: existingSession,
-        restaurant,
-        table: tableResponse,
-      };
-    }
+    const diningSession =
+      (await findActiveDiningSessionByTableId(table.id)) ??
+      (await prisma.diningSession.create({
+        data: {
+          restaurantId: table.restaurantId,
+          tableId: table.id,
+          status: "active",
+          startedAt: new Date(),
+        },
+      }));
 
     const sessionToken = `sess_${randomUUID()}`;
     const session = await prisma.customerSession.create({
       data: {
+        diningSessionId: diningSession.id,
         restaurantId: table.restaurantId,
         tableId: table.id,
         sessionToken,
@@ -45,6 +46,7 @@ export async function createCustomerSession(qrCodeToken: string) {
     return {
       sessionToken,
       session,
+      diningSession,
       restaurant,
       table: tableResponse,
     };
@@ -62,9 +64,18 @@ export async function createCustomerSession(qrCodeToken: string) {
       sessionToken,
       session: {
         id: Date.now(),
+        diningSessionId: Date.now(),
         restaurantId: fallbackRestaurant.id,
         tableId: table.id,
         sessionToken,
+        status: "active",
+        startedAt: new Date(),
+        endedAt: null,
+      },
+      diningSession: {
+        id: Date.now(),
+        restaurantId: fallbackRestaurant.id,
+        tableId: table.id,
         status: "active",
         startedAt: new Date(),
         endedAt: null,
@@ -89,6 +100,7 @@ export async function getCustomerSession(sessionToken: string) {
     return {
       session: {
         id: 1,
+        diningSessionId: 1,
         restaurantId: fallbackRestaurant.id,
         tableId: 1,
         sessionToken,

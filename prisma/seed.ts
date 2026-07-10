@@ -355,10 +355,29 @@ async function main() {
   });
 
   if (table2) {
+    const diningSession =
+      (await prisma.diningSession.findFirst({
+        where: {
+          tableId: table2.id,
+          status: "active",
+        },
+      })) ??
+      (await prisma.diningSession.create({
+        data: {
+          restaurantId: restaurant.id,
+          tableId: table2.id,
+          status: "active",
+          startedAt: new Date(),
+        },
+      }));
+
     const session = await prisma.customerSession.upsert({
       where: { sessionToken: "test-session-table-2" },
-      update: {},
+      update: {
+        diningSessionId: diningSession.id,
+      },
       create: {
+        diningSessionId: diningSession.id,
         restaurantId: restaurant.id,
         tableId: table2.id,
         sessionToken: "test-session-table-2",
