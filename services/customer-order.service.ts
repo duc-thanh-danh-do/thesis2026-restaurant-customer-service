@@ -216,3 +216,66 @@ export async function confirmOrder(orderId: number) {
     },
   });
 }
+
+export async function updateDraftOrderItemQuantity({
+  orderId,
+  itemId,
+  quantity,
+}: {
+  orderId: number;
+  itemId: number;
+  quantity: number;
+}) {
+  if (!Number.isInteger(orderId)) {
+    throw new HttpError("Invalid order id", "INVALID_ORDER_ID", 400);
+  }
+
+  if (!Number.isInteger(itemId)) {
+    throw new HttpError("Invalid order item id", "INVALID_ORDER_ITEM_ID", 400);
+  }
+
+  if (!Number.isInteger(quantity) || quantity < 0) {
+    throw new HttpError("Invalid quantity", "INVALID_QUANTITY", 400);
+  }
+
+  const order = await getOrderWithItems(orderId);
+
+  if (!order) throw new HttpError("Order not found", "ORDER_NOT_FOUND", 404);
+  if (order.status !== CUSTOMER_DRAFT_ORDER_STATUS) {
+    throw new HttpError("Only unconfirmed orders can be edited", "ORDER_NOT_UNCONFIRMED", 400);
+  }
+
+  const orderItem = order.orderItems.find((item) => item.id === itemId);
+  if (!orderItem) {
+    throw new HttpError("Order item not found", "ORDER_ITEM_NOT_FOUND", 404);
+  }
+
+  if (quantity === 0) {
+    await prisma.orderItem.delete({
+      where: { id: itemId },
+    });
+  } else {
+    await prisma.orderItem.update({
+      where: { id: itemId },
+      data: { quantity },
+    });
+  }
+
+  const updatedItems = await prisma.orderItem.findMany({
+    where: { orderId },
+  });
+  const updatedTotal = updatedItems.reduce(
+    (sum, item) => sum + Number(item.price) * item.quantity,
+    0,
+  );
+
+  return prisma.order.update({
+    where: { id: orderId },
+    data: { total: updatedTotal },
+    include: {
+      orderItems: {
+        orderBy: { id: "asc" },
+      },
+    },
+  });
+}

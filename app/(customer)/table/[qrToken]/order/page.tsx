@@ -165,6 +165,34 @@ export default function OrderPage() {
     );
   };
 
+  const updateOrderDraftItemQuantity = async (
+    orderId: number,
+    itemId: number,
+    quantity: number,
+  ) => {
+    const response = await fetch(`/api/customer-orders/${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update_item_quantity',
+        itemId,
+        quantity,
+      }),
+    });
+
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { order: CustomerOrderDraft };
+
+    setOrders((current) =>
+      current.map((order) =>
+        order.id === orderId
+          ? { ...order, ...payload.order, tableNumber: order.tableNumber }
+          : order,
+      ),
+    );
+  };
+
   return (
     <CustomerMobileLayout>
       <CustomerMobileHeader
@@ -189,6 +217,7 @@ export default function OrderPage() {
                 draft={order}
                 editHref={`${basePath}/menu`}
                 onConfirm={confirmOrderDraft}
+                onUpdateItemQuantity={updateOrderDraftItemQuantity}
                 className="mb-4"
               />
             ) : (

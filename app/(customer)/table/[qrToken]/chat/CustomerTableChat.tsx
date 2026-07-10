@@ -249,6 +249,34 @@ export default function CustomerTableChat({
     );
   };
 
+  const updateOrderDraftItemQuantity = async (
+    orderId: number,
+    itemId: number,
+    quantity: number,
+  ) => {
+    const response = await fetch(`/api/customer-orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update_item_quantity",
+        itemId,
+        quantity,
+      }),
+    });
+
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { order: CustomerOrderDraft };
+
+    setMessages((current) =>
+      current.map((currentMessage) =>
+        currentMessage.orderDraft?.id === orderId
+          ? { ...currentMessage, orderDraft: payload.order }
+          : currentMessage,
+      ),
+    );
+  };
+
   return (
     <CustomerMobileLayout>
       <CustomerMobileHeader
@@ -311,6 +339,7 @@ export default function CustomerTableChat({
                       draft={msg.orderDraft}
                       editHref={`${basePath}/order`}
                       onConfirm={confirmOrderDraft}
+                      onUpdateItemQuantity={updateOrderDraftItemQuantity}
                       className="mt-3"
                     />
                   ) : null}
