@@ -11,19 +11,17 @@ import {
   CustomerMobileHeader,
   CustomerMobileLayout,
 } from "@/components/layout/CustomerMobileLayout";
+import {
+  getCartStorageKey,
+  getSessionStorageKey,
+  parseStoredCart,
+} from "@/lib/customer-storage";
 
-const cartStorageKey = "bistro-demo-cart";
-
-function getCartCount() {
-  const savedCart = window.localStorage.getItem(cartStorageKey);
-  if (!savedCart) return 0;
-
-  try {
-    const cart = JSON.parse(savedCart) as Record<string, number>;
-    return Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
-  } catch {
-    return 0;
-  }
+function getCartCount(qrToken: string) {
+  const cart = parseStoredCart(
+    window.localStorage.getItem(getCartStorageKey(qrToken)),
+  );
+  return Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
 }
 
 type Message = {
@@ -78,6 +76,7 @@ export default function CustomerTableChat({
   tableNumber: string;
 }) {
   const basePath = `/table/${qrToken}`;
+  const sessionStorageKey = getSessionStorageKey(qrToken);
   const [message, setMessage] = useState("");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
@@ -89,9 +88,9 @@ export default function CustomerTableChat({
       const welcomeMessage = createWelcomeMessage(restaurantName, tableNumber);
 
       setMessages([welcomeMessage]);
-      setCartCount(getCartCount());
+      setCartCount(getCartCount(qrToken));
       try {
-        const savedSessionToken = window.localStorage.getItem("dining-session-token");
+        const savedSessionToken = window.localStorage.getItem(sessionStorageKey);
 
         if (savedSessionToken) {
           const response = await fetch(`/api/customer-sessions/${savedSessionToken}`);
@@ -122,7 +121,7 @@ export default function CustomerTableChat({
         if (!response.ok) return;
 
         const payload = (await response.json()) as { sessionToken: string };
-        window.localStorage.setItem("dining-session-token", payload.sessionToken);
+        window.localStorage.setItem(sessionStorageKey, payload.sessionToken);
         setSessionToken(payload.sessionToken);
       } catch {
         setSessionToken(null);
@@ -130,7 +129,7 @@ export default function CustomerTableChat({
     }
 
     loadSession();
-  }, [qrToken, restaurantName, tableNumber]);
+  }, [qrToken, restaurantName, sessionStorageKey, tableNumber]);
 
   const sendMessage = async (content = message) => {
     const trimmedMessage = content.trim();
@@ -197,7 +196,7 @@ export default function CustomerTableChat({
       };
 
       if (payload.sessionToken) {
-        window.localStorage.setItem("dining-session-token", payload.sessionToken);
+        window.localStorage.setItem(sessionStorageKey, payload.sessionToken);
         setSessionToken(payload.sessionToken);
       }
 
@@ -233,7 +232,7 @@ export default function CustomerTableChat({
     const response = await fetch(`/api/customer-orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "confirm" }),
+      body: JSON.stringify({ action: "confirm", sessionToken }),
     });
 
     if (!response.ok) return;
@@ -261,6 +260,7 @@ export default function CustomerTableChat({
         action: "update_item_quantity",
         itemId,
         quantity,
+        sessionToken,
       }),
     });
 

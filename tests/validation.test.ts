@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   chatMessageSchema,
+  createCustomerRequestSchema,
   createCustomerSessionSchema,
   menuItemFilterSchema,
   updateCustomerSessionSchema,
@@ -44,4 +45,23 @@ test("menu filter validation accepts supported query filters", () => {
   );
 
   assert.equal(menuItemFilterSchema.safeParse({ isAvailable: "yes" }).success, false);
+});
+
+test("customer request validation accepts known types and rejects oversized or unknown requests", () => {
+  assert.deepEqual(
+    createCustomerRequestSchema.parse({
+      requestType: "bill",
+      description: "  Please bring the bill.  ",
+    }),
+    { requestType: "bill", description: "Please bring the bill." },
+  );
+  assert.throws(() =>
+    createCustomerRequestSchema.parse({ requestType: "delete_everything" }),
+  );
+  assert.throws(() =>
+    createCustomerRequestSchema.parse({
+      requestType: "staff_help",
+      description: "x".repeat(1001),
+    }),
+  );
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getSessionStorageKey } from "@/lib/customer-storage";
 
 export default function StartSession({ qrToken }: { qrToken: string }) {
   const router = useRouter();
@@ -22,7 +23,10 @@ export default function StartSession({ qrToken }: { qrToken: string }) {
         }
 
         const payload = (await response.json()) as { sessionToken: string };
-        window.localStorage.setItem("dining-session-token", payload.sessionToken);
+        window.localStorage.setItem(
+          getSessionStorageKey(qrToken),
+          payload.sessionToken,
+        );
         router.replace(`/table/${qrToken}/menu`);
       } catch (sessionError) {
         setError(

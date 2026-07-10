@@ -4,16 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-async function getRestaurantId() {
-  const restaurant = await prisma.restaurant.findFirst();
-  if (!restaurant) throw new Error("Database has no restaurant!");
-
-  return restaurant.id;
-}
-
 export async function getDietaryTagsAction() {
     try {
-      const rId = await getRestaurantId();
+      const staffUser = await requireAdminUser();
+      const rId = staffUser.restaurantId;
       const tags = await prisma.dietaryCatalog.findMany({
         where: { restaurantId: rId },
         orderBy: { name: "asc" },
@@ -27,7 +21,8 @@ export async function getDietaryTagsAction() {
 
 export async function getIngredientsAction() {
   try {
-    const rId = await getRestaurantId();
+    const staffUser = await requireAdminUser();
+    const rId = staffUser.restaurantId;
     const tags = await prisma.ingredientCatalog.findMany({
       where: { restaurantId: rId},
       orderBy: { name: "asc" },
@@ -40,10 +35,10 @@ export async function getIngredientsAction() {
 }
 
 export async function createDietaryTagAction(name: string) {
-  await requireAdminUser();
+  const staffUser = await requireAdminUser();
 
   try {
-    const rId = await getRestaurantId(); 
+    const rId = staffUser.restaurantId;
     const newTag = await prisma.dietaryCatalog.create({
       data: { name, restaurantId: rId },
     });
@@ -55,10 +50,10 @@ export async function createDietaryTagAction(name: string) {
 }
 
 export async function deleteDietaryTagAction(name: string) {
-  await requireAdminUser();
+  const staffUser = await requireAdminUser();
 
   try {
-    const rId = await getRestaurantId(); 
+    const rId = staffUser.restaurantId;
     await prisma.dietaryCatalog.deleteMany({
       where: { name, restaurantId: rId },
     });
@@ -70,10 +65,10 @@ export async function deleteDietaryTagAction(name: string) {
 }
 
 export async function createIngredientAction(name: string) {
-    await requireAdminUser();
+    const staffUser = await requireAdminUser();
 
     try {
-      const rId = await getRestaurantId(); 
+      const rId = staffUser.restaurantId;
       const newTag = await prisma.ingredientCatalog.create({
         data: { name, restaurantId: rId },
       });
@@ -89,10 +84,10 @@ export async function createIngredientAction(name: string) {
   }
   
   export async function deleteIngredientAction(name: string) {
-    await requireAdminUser();
+    const staffUser = await requireAdminUser();
 
     try {
-      const rId = await getRestaurantId(); 
+      const rId = staffUser.restaurantId;
       await prisma.ingredientCatalog.deleteMany({
         where: { name, restaurantId: rId },
       });

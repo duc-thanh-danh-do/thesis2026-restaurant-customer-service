@@ -9,15 +9,11 @@ import {
   CustomerMobileLayout,
 } from "@/components/layout/CustomerMobileLayout";
 import type { CustomerMenuItem } from "./page";
+import { getCartStorageKey, parseStoredCart } from "@/lib/customer-storage";
 
-const cartStorageKey = "bistro-demo-cart";
-
-function getInitialCart() {
+function getInitialCart(qrToken: string) {
   if (typeof window !== "undefined") {
-    const savedCart = window.localStorage.getItem(cartStorageKey);
-    if (savedCart) {
-      return JSON.parse(savedCart) as Record<string, number>;
-    }
+    return parseStoredCart(window.localStorage.getItem(getCartStorageKey(qrToken)));
   }
 
   return {};
@@ -34,14 +30,17 @@ export default function CustomerTableMenu({
 }) {
   const params = useParams<{ qrToken: string }>();
   const basePath = `/table/${params.qrToken}`;
+  const cartStorageKey = getCartStorageKey(params.qrToken);
   const [selectedCategory, setSelectedCategory] = useState(
     menuItems[0]?.category ?? "Other",
   );
-  const [cart, setCart] = useState<Record<string, number>>(getInitialCart);
+  const [cart, setCart] = useState<Record<string, number>>(() =>
+    getInitialCart(params.qrToken),
+  );
 
   useEffect(() => {
     window.localStorage.setItem(cartStorageKey, JSON.stringify(cart));
-  }, [cart]);
+  }, [cart, cartStorageKey]);
 
   const categories = useMemo(
     () => Array.from(new Set(menuItems.map((item) => item.category))),
@@ -181,7 +180,6 @@ export default function CustomerTableMenu({
         activeTab="menu"
         basePath={basePath}
         cartCount={cartCount > 0 ? cartCount : undefined}
-        orderCount={1}
       />
     </CustomerMobileLayout>
   );

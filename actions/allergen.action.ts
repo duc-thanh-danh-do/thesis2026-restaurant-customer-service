@@ -2,8 +2,11 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireAdminUser } from "@/lib/auth";
 
 export async function getAllergensAction() {
+  await requireAdminUser();
+
   try {
     const allergens = await prisma.allergen.findMany({
       orderBy: { name: "asc" },
@@ -16,6 +19,8 @@ export async function getAllergensAction() {
 }
 
 export async function createAllergenAction(name: string, description?: string) {
+  await requireAdminUser();
+
   try {
     const existing = await prisma.allergen.findUnique({ where: { name } });
     if (existing) {
@@ -35,6 +40,8 @@ export async function createAllergenAction(name: string, description?: string) {
 }
 
 export async function deleteAllergenAction(id: number) {
+  await requireAdminUser();
+
   try {
     await prisma.allergen.delete({ where: { id } });
     revalidatePath("/allergens");

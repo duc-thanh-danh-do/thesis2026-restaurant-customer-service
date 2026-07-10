@@ -37,12 +37,6 @@ export type CreateRestaurantTableActionDeps = {
   redirect: (path: string) => never;
 };
 
-async function getRestaurantId() {
-  const restaurant = await prisma.restaurant.findFirst();
-  if (!restaurant) throw new Error("Database has no restaurant!");
-  return restaurant.id;
-}
-
 async function createRestaurantTableActionCore(
   deps: CreateRestaurantTableActionDeps,
   _previousState: CreateTableState,
@@ -138,7 +132,8 @@ export { createRestaurantTableActionCore as createRestaurantTableActionForTest }
 export async function getAllTablesAction() {
   try {
     const staffUser = await getCurrentStaffUser();
-    const rId = staffUser?.restaurantId ?? (await getRestaurantId());
+    if (!staffUser) return [];
+    const rId = staffUser.restaurantId;
     const tables = await prisma.restaurantTable.findMany({
       where: {
         restaurantId: rId,

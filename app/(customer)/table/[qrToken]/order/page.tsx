@@ -14,8 +14,12 @@ import {
 import OrderDraftCard, {
   type CustomerOrderDraft,
 } from "@/components/customer/OrderDraftCard";
+import {
+  getCartStorageKey,
+  getSessionStorageKey,
+  parseStoredCart,
+} from "@/lib/customer-storage";
 
-const cartStorageKey = "bistro-demo-cart";
 const orderSteps = ["Placed", "Preparing", "Ready", "Served"];
 
 type CustomerOrder = {
@@ -32,20 +36,19 @@ type CustomerOrder = {
   }>;
 };
 
-function getInitialCartCount() {
+function getInitialCartCount(qrToken: string) {
   if (typeof window === "undefined") return 0;
 
-  const savedCart = window.localStorage.getItem(cartStorageKey);
-  if (!savedCart) return 0;
-
-  const cart = JSON.parse(savedCart) as Record<string, number>;
+  const cart = parseStoredCart(
+    window.localStorage.getItem(getCartStorageKey(qrToken)),
+  );
   return Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
 }
 
-function getSavedSessionToken() {
+function getSavedSessionToken(qrToken: string) {
   if (typeof window === "undefined") return null;
 
-  return window.localStorage.getItem("dining-session-token");
+  return window.localStorage.getItem(getSessionStorageKey(qrToken));
 }
 
 function formatOrderStatus(status: string) {
@@ -74,7 +77,7 @@ export default function OrderPage() {
   const basePath = `/table/${params.qrToken}`;
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [tableNumber, setTableNumber] = useState("");
-  const [cartCount] = useState(getInitialCartCount);
+  const [cartCount] = useState(() => getInitialCartCount(params.qrToken));
   const loadOrdersInFlightRef = useRef(false);
   const loadOrdersAbortRef = useRef<AbortController | null>(null);
 
@@ -86,7 +89,7 @@ export default function OrderPage() {
     loadOrdersAbortRef.current?.abort();
     loadOrdersAbortRef.current = abortController;
 
-    const sessionToken = getSavedSessionToken();
+    const sessionToken = getSavedSessionToken(params.qrToken);
     const searchParams = new URLSearchParams({
       qrToken: params.qrToken,
     });
@@ -146,10 +149,13 @@ export default function OrderPage() {
   );
 
   const confirmOrderDraft = async (orderId: number) => {
+    const sessionToken = getSavedSessionToken(params.qrToken);
+    if (!sessionToken) return;
+
     const response = await fetch(`/api/customer-orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "confirm" }),
+      body: JSON.stringify({ action: "confirm", sessionToken }),
     });
 
     if (!response.ok) return;
@@ -170,6 +176,9 @@ export default function OrderPage() {
     itemId: number,
     quantity: number,
   ) => {
+    const sessionToken = getSavedSessionToken(params.qrToken);
+    if (!sessionToken) return;
+
     const response = await fetch(`/api/customer-orders/${orderId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -177,6 +186,7 @@ export default function OrderPage() {
         action: 'update_item_quantity',
         itemId,
         quantity,
+        sessionToken,
       }),
     });
 

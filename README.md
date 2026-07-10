@@ -51,3 +51,15 @@ npx prisma generate
 
 4. Start the development server:
    npm run dev
+
+## Testing
+
+```bash
+npm test            # Node unit and database-backed integration tests
+npm run typecheck   # TypeScript validation
+npm run lint        # ESLint
+npm run test:e2e    # Playwright application tests
+npm run test:all    # Complete local verification sequence
+```
+
+The current implementation status against the application test strategy is documented in [docs/test-strategy-implementation.md](docs/test-strategy-implementation.md).

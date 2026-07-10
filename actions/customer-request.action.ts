@@ -5,28 +5,77 @@ import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { getCurrentStaffUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
+const REQUEST_STATUSES = new Set(["Waiting", "In progress", "Resolved"]);
+
+type RequestActionDependencies = {
+  getCurrentStaffUser: () => Promise<{ restaurantId: number } | null>;
+  findActiveRequests: (restaurantId: number) => Promise<unknown[]>;
+};
+
+type UpdateRequestDependencies = {
+  getCurrentStaffUser: () => Promise<{ restaurantId: number } | null>;
+  updateOwnedRequest: (input: {
+    requestId: number;
+    restaurantId: number;
+    status: string;
+    resolvedAt: Date | null;
+  }) => Promise<number>;
+};
+
+async function getActiveRequestsActionCore(deps: RequestActionDependencies) {
+  const staffUser = await deps.getCurrentStaffUser();
+  if (!staffUser) return [];
+  return deps.findActiveRequests(staffUser.restaurantId);
+}
+
+async function updateRequestStatusCore(
+  deps: UpdateRequestDependencies,
+  requestId: number,
+  newStatus: string,
+) {
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return { success: false, error: "Invalid request." };
+  }
+  if (!REQUEST_STATUSES.has(newStatus)) {
+    return { success: false, error: "Invalid request status." };
+  }
+
+  const staffUser = await deps.getCurrentStaffUser();
+  if (!staffUser) {
+    return { success: false, error: "Staff sign in is required." };
+  }
+
+  const updatedCount = await deps.updateOwnedRequest({
+    requestId,
+    restaurantId: staffUser.restaurantId,
+    status: newStatus,
+    resolvedAt: newStatus === "Resolved" ? new Date() : null,
+  });
+  if (updatedCount === 0) {
+    return { success: false, error: "Request not found." };
+  }
+
+  return { success: true };
+}
+
 // Get requests
 export async function getActiveRequestsAction() {
   try {
-    const requests = await prisma.customerRequest.findMany({
-      where: {
-        status: {
-          not: "Resolved", 
+    return await getActiveRequestsActionCore({
+      getCurrentStaffUser,
+      findActiveRequests: (restaurantId) => prisma.customerRequest.findMany({
+        where: {
+          status: { not: "Resolved" },
+          session: { restaurantId },
         },
-      },
-      include: {
-        session: {
-          include: {
-            table: true,
+        include: {
+          session: {
+            include: { table: true },
           },
         },
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
+        orderBy: { createdAt: "asc" },
+      }),
     });
-
-    return requests;
   } catch (error) {
     if (isDatabaseUnavailable(error)) return [];
 
@@ -41,27 +90,24 @@ export async function updateRequestStatus(
   newStatus: string
 ) {
   try {
-    const staffUser = await getCurrentStaffUser();
-    if (!staffUser) {
-      return {
-        success: false,
-        error: "Staff sign in is required.",
-      };
-    }
-
-    const updatedRequest = await prisma.customerRequest.update({
-      where: {
-        id: requestId,
+    const result = await updateRequestStatusCore(
+      {
+        getCurrentStaffUser,
+        updateOwnedRequest: async ({ requestId: id, restaurantId, status, resolvedAt }) => {
+          const updated = await prisma.customerRequest.updateMany({
+            where: { id, session: { restaurantId } },
+            data: { status, resolvedAt },
+          });
+          return updated.count;
+        },
       },
-      data: {
-        status: newStatus,
-        resolvedAt: newStatus === "Resolved" ? new Date() : null,
-      },
-    });
+      requestId,
+      newStatus,
+    );
 
-    revalidatePath("/", "layout");
+    if (result.success) revalidatePath("/", "layout");
 
-    return { success: true, data: updatedRequest };
+    return result;
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
       return {
@@ -80,12 +126,16 @@ export async function updateRequestStatus(
 
 export async function getTableRequestsAction(tableNumber: string) {
   try {
+    const staffUser = await getCurrentStaffUser();
+    if (!staffUser) return [];
+
     const requests = await prisma.customerRequest.findMany({
       where: {
         status: {
           not: "Resolved",
         },
         session: {
+          restaurantId: staffUser.restaurantId,
           table: {
             tableNumber: tableNumber,
           },
@@ -104,3 +154,8 @@ export async function getTableRequestsAction(tableNumber: string) {
     return [];
   }
 }
+
+export {
+  getActiveRequestsActionCore as getActiveRequestsActionForTest,
+  updateRequestStatusCore as updateRequestStatusForTest,
+};

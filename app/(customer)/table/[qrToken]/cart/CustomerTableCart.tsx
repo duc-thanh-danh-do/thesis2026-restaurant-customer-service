@@ -6,16 +6,15 @@ import { useParams, useRouter } from 'next/navigation';
 import { Minus, Plus } from 'lucide-react';
 import { CustomerBottomNav, CustomerMobileHeader, CustomerMobileLayout } from '@/components/layout/CustomerMobileLayout';
 import type { CustomerCartMenuItem } from './page';
+import {
+  getCartStorageKey,
+  getSessionStorageKey,
+  parseStoredCart,
+} from '@/lib/customer-storage';
 
-const cartStorageKey = 'bistro-demo-cart';
-const orderStorageKey = 'bistro-demo-order';
-
-function getInitialCart() {
+function getInitialCart(qrToken: string) {
   if (typeof window !== 'undefined') {
-    const savedCart = window.localStorage.getItem(cartStorageKey);
-    if (savedCart) {
-      return JSON.parse(savedCart) as Record<string, number>;
-    }
+    return parseStoredCart(window.localStorage.getItem(getCartStorageKey(qrToken)));
   }
 
   return {};
@@ -31,11 +30,15 @@ export default function CustomerTableCart({
   const params = useParams<{ qrToken: string }>();
   const router = useRouter();
   const basePath = `/table/${params.qrToken}`;
-  const [cart, setCart] = useState<Record<string, number>>(getInitialCart);
+  const cartStorageKey = getCartStorageKey(params.qrToken);
+  const sessionStorageKey = getSessionStorageKey(params.qrToken);
+  const [cart, setCart] = useState<Record<string, number>>(() =>
+    getInitialCart(params.qrToken),
+  );
 
   useEffect(() => {
     window.localStorage.setItem(cartStorageKey, JSON.stringify(cart));
-  }, [cart]);
+  }, [cart, cartStorageKey]);
 
   const cartItems = useMemo(
     () =>
@@ -73,7 +76,7 @@ export default function CustomerTableCart({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         qrToken: params.qrToken,
-        sessionToken: window.localStorage.getItem('dining-session-token'),
+        sessionToken: window.localStorage.getItem(sessionStorageKey),
         items: cart,
       }),
     });
@@ -85,8 +88,7 @@ export default function CustomerTableCart({
       sessionToken: string;
     };
 
-    window.localStorage.setItem('dining-session-token', payload.sessionToken);
-    window.localStorage.setItem(orderStorageKey, String(payload.order.id));
+    window.localStorage.setItem(sessionStorageKey, payload.sessionToken);
     setCart({});
     router.push(`${basePath}/order`);
   };
@@ -174,7 +176,7 @@ export default function CustomerTableCart({
         </Link>
       </div>
 
-      <CustomerBottomNav activeTab="cart" basePath={basePath} cartCount={cartCount > 0 ? cartCount : undefined} orderCount={1} />
+      <CustomerBottomNav activeTab="cart" basePath={basePath} cartCount={cartCount > 0 ? cartCount : undefined} />
     </CustomerMobileLayout>
   );
 }
