@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { HttpError } from "@/lib/http-errors";
 import {
+  canUseCustomerFallbackData,
   fallbackRestaurant,
   fallbackTables,
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
 import {
-  findActiveDiningSessionByTableId,
   findSessionByToken,
   findTableByQrToken,
 } from "@/repositories/customer-session.repository";
@@ -20,16 +20,27 @@ export async function createCustomerSession(qrCodeToken: string) {
     if (!table.isActive) throw new HttpError("Restaurant table is inactive", "TABLE_INACTIVE", 400);
 
     const { restaurant, ...tableResponse } = table;
-    const diningSession =
-      (await findActiveDiningSessionByTableId(table.id)) ??
-      (await prisma.diningSession.create({
-        data: {
-          restaurantId: table.restaurantId,
-          tableId: table.id,
-          status: "active",
-          startedAt: new Date(),
-        },
-      }));
+    const diningSession = await prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(${table.id})`;
+
+      return (
+        (await transaction.diningSession.findFirst({
+          where: {
+            tableId: table.id,
+            status: { in: ["active", "waiting_staff"] },
+          },
+          orderBy: { startedAt: "desc" },
+        })) ??
+        (await transaction.diningSession.create({
+          data: {
+            restaurantId: table.restaurantId,
+            tableId: table.id,
+            status: "active",
+            startedAt: new Date(),
+          },
+        }))
+      );
+    });
 
     const sessionToken = `sess_${randomUUID()}`;
     const session = await prisma.customerSession.create({
@@ -52,6 +63,9 @@ export async function createCustomerSession(qrCodeToken: string) {
     };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseCustomerFallbackData()) {
+      throw new HttpError("Customer sessions are temporarily unavailable.", "DATABASE_UNAVAILABLE", 503);
+    }
 
     const table = fallbackTables.find((record) => record.qrCodeToken === qrCodeToken);
 
@@ -96,6 +110,9 @@ export async function getCustomerSession(sessionToken: string) {
     return { session };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseCustomerFallbackData()) {
+      throw new HttpError("Customer sessions are temporarily unavailable.", "DATABASE_UNAVAILABLE", 503);
+    }
 
     return {
       session: {
@@ -130,6 +147,9 @@ export async function closeCustomerSession(sessionToken: string) {
     });
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseCustomerFallbackData()) {
+      throw new HttpError("Customer sessions are temporarily unavailable.", "DATABASE_UNAVAILABLE", 503);
+    }
 
     return {
       id: 1,

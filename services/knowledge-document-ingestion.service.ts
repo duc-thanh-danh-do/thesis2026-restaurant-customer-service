@@ -57,29 +57,48 @@ export async function ingestKnowledgeDocument({
   try {
     validateKnowledgeDocumentFile(file);
 
-    const [document] = await prisma.$queryRaw<KnowledgeDocumentRow[]>`
-      INSERT INTO "knowledge_documents" (
-        "restaurant_id",
-        "uploaded_by_staff_id",
-        "original_filename",
-        "mime_type",
-        "file_size",
-        "status",
-        "created_at",
-        "updated_at"
-      )
-      VALUES (
-        ${restaurantId},
-        ${uploadedByStaffId},
-        ${file.name},
-        ${file.type || "application/octet-stream"},
-        ${file.size},
-        'processing',
-        NOW(),
-        NOW()
-      )
-      RETURNING "id"
-    `;
+    const document = await prisma.$transaction(async (tx) => {
+      const [createdDocument] = await tx.$queryRaw<KnowledgeDocumentRow[]>`
+        INSERT INTO "knowledge_documents" (
+          "restaurant_id",
+          "uploaded_by_staff_id",
+          "original_filename",
+          "mime_type",
+          "file_size",
+          "status",
+          "created_at",
+          "updated_at"
+        )
+        VALUES (
+          ${restaurantId},
+          ${uploadedByStaffId},
+          ${file.name},
+          ${file.type || "application/octet-stream"},
+          ${file.size},
+          'processing',
+          NOW(),
+          NOW()
+        )
+        RETURNING "id"
+      `;
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId,
+          actorStaffId: uploadedByStaffId,
+          actorType: "STAFF",
+          action: "KNOWLEDGE_DOCUMENT_UPLOADED",
+          metadata: {
+            documentId: createdDocument.id,
+            originalFilename: file.name,
+            mimeType: file.type || "application/octet-stream",
+            fileSize: file.size,
+          },
+        },
+      });
+
+      return createdDocument;
+    });
 
     documentId = document.id;
     const text = normalizeKnowledgeDocumentText(
@@ -280,21 +299,25 @@ async function markDocumentStatus(
 }
 
 function findChunkSplitIndex(text: string, chunkSize: number) {
+  const minimumReadableChunk = Math.min(
+    MIN_CHUNK_SIZE,
+    Math.max(1, Math.floor(chunkSize / 2)),
+  );
   const paragraphBreak = text.lastIndexOf("\n\n", chunkSize);
-  if (paragraphBreak >= MIN_CHUNK_SIZE) return paragraphBreak;
+  if (paragraphBreak >= minimumReadableChunk) return paragraphBreak;
 
   const lineBreak = text.lastIndexOf("\n", chunkSize);
-  if (lineBreak >= MIN_CHUNK_SIZE) return lineBreak;
+  if (lineBreak >= minimumReadableChunk) return lineBreak;
 
   const sentenceBreak = Math.max(
     text.lastIndexOf(". ", chunkSize),
     text.lastIndexOf("? ", chunkSize),
     text.lastIndexOf("! ", chunkSize),
   );
-  if (sentenceBreak >= MIN_CHUNK_SIZE) return sentenceBreak + 1;
+  if (sentenceBreak >= minimumReadableChunk) return sentenceBreak + 1;
 
   const wordBreak = text.lastIndexOf(" ", chunkSize);
-  if (wordBreak >= MIN_CHUNK_SIZE) return wordBreak;
+  if (wordBreak >= minimumReadableChunk) return wordBreak;
 
   return chunkSize;
 }
