@@ -11,18 +11,20 @@ export function buildCustomerContext(context: CustomerPromptContext) {
 }
 
 export function buildGeminiPrompt({
+  instructionPrompt,
   groundedContext,
   customerContext,
   conversationHistory,
   customerMessage,
 }: {
+  instructionPrompt?: string | null;
   groundedContext: string;
   customerContext: string;
   conversationHistory: string;
   customerMessage: string;
 }) {
   return [
-    "You are a restaurant customer-service assistant.",
+    instructionPrompt?.trim() || "You are a restaurant customer-service assistant.",
     "Answer concisely and helpfully using only the restaurant data provided below.",
     "Do not invent menu items, prices, allergens, availability, ingredients, or policies.",
     "If the answer is not available in the provided data, say that the information is not available.",

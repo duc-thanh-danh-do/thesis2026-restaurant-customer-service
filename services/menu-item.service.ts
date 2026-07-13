@@ -3,7 +3,11 @@ import {
   findMenuItems,
   type MenuItemFilters,
 } from "@/repositories/menu-item.repository";
-import { fallbackMenuItems, isDatabaseUnavailable } from "@/lib/fallback-data";
+import {
+  canUseCustomerFallbackData,
+  fallbackMenuItems,
+  isDatabaseUnavailable,
+} from "@/lib/fallback-data";
 
 export async function getMenuItems(
   restaurantId: number,
@@ -35,6 +39,7 @@ export async function getMenuItems(
     };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseCustomerFallbackData()) throw error;
 
     return {
       menuItems: fallbackMenuItems.filter((item) => {

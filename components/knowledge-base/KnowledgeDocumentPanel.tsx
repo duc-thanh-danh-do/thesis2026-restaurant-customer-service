@@ -13,9 +13,12 @@ import {
 } from "lucide-react";
 import {
   deleteKnowledgeDocumentAction,
+  approveKnowledgeDocumentAction,
   getKnowledgeDocumentsAction,
+  publishKnowledgeDocumentAction,
   updateKnowledgeDocumentActiveAction,
   uploadKnowledgeDocumentAction,
+  validateKnowledgeDocumentAction,
   type KnowledgeDocument,
 } from "@/actions/knowledge-document.action";
 import { Button } from "@/components/ui/button";
@@ -107,6 +110,26 @@ export default function KnowledgeDocumentPanel() {
     });
   };
 
+  const handleWorkflow = (
+    document: KnowledgeDocument,
+    operation: "validate" | "approve" | "publish",
+  ) => {
+    startTransition(async () => {
+      const result =
+        operation === "validate"
+          ? await validateKnowledgeDocumentAction(document.id)
+          : operation === "approve"
+            ? await approveKnowledgeDocumentAction(document.id)
+            : await publishKnowledgeDocumentAction(document.id);
+      showToast(
+        result.success
+          ? `${document.originalFilename} ${operation}d`
+          : result.error ?? `Failed to ${operation} document`,
+      );
+      fetchDocuments();
+    });
+  };
+
   return (
     <section className="space-y-3">
       <Card className="bg-white border border-[#d5e1ec] rounded-lg p-4 shadow-sm">
@@ -175,6 +198,7 @@ export default function KnowledgeDocumentPanel() {
                       {document.originalFilename}
                     </h3>
                     <StatusBadge status={document.status} />
+                    <PublicationBadge status={document.publicationStatus} />
                     {!document.isActive ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
                         Inactive
@@ -197,12 +221,21 @@ export default function KnowledgeDocumentPanel() {
                     : "No date"}
                 </p>
                 <div className="flex shrink-0 items-center gap-1">
+                  {document.publicationStatus === "DRAFT" ? (
+                    <Button type="button" variant="outline" size="sm" disabled={isPending || document.status !== "ready"} onClick={() => handleWorkflow(document, "validate")}>Validate</Button>
+                  ) : null}
+                  {document.publicationStatus === "VALIDATED" ? (
+                    <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => handleWorkflow(document, "approve")}>Approve</Button>
+                  ) : null}
+                  {document.publicationStatus === "APPROVED" ? (
+                    <Button type="button" size="sm" disabled={isPending} onClick={() => handleWorkflow(document, "publish")}>Publish</Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => handleToggleActive(document)}
-                    disabled={isPending || document.status !== "ready"}
+                    disabled={isPending || document.publicationStatus !== "PUBLISHED"}
                     title={
                       document.isActive
                         ? "Deactivate document"
@@ -292,6 +325,17 @@ function StatusBadge({ status }: { status: string }) {
       Processing
     </span>
   );
+}
+
+function PublicationBadge({ status }: { status: string }) {
+  const tone = status === "PUBLISHED"
+    ? "bg-emerald-50 text-emerald-700"
+    : status === "APPROVED"
+      ? "bg-blue-50 text-blue-700"
+      : status === "VALIDATED"
+        ? "bg-violet-50 text-violet-700"
+        : "bg-slate-100 text-slate-600";
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${tone}`}>{status}</span>;
 }
 
 function formatFileSize(size: number) {

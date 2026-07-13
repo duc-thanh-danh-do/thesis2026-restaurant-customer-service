@@ -21,6 +21,7 @@ model Restaurant {
   knowledgeBase RestaurantKnowledgeBase[]
   knowledgeDocuments KnowledgeDocument[]
   handoverRules HandoverRule[]
+  instructionVersions AiInstructionVersion[]
 
   ingredientCatalogs IngredientCatalog[]
   dietaryCatalogs    DietaryCatalog[]
@@ -74,6 +75,9 @@ model CustomerSession {
   aiResponseLogs   AiResponseLog[]
 
   @@map("customer_sessions")
+  @@index([restaurantId])
+  @@index([tableId, status])
+  @@index([diningSessionId])
 }
 
 model StaffUser {
@@ -102,6 +106,7 @@ model ChatMessage {
   aiResponseLogs         AiResponseLog[] @relation("AiMessageLog")
 
   @@map("chat_messages")
+  @@index([sessionId, id])
 }
 
 model CustomerRequest {
@@ -115,6 +120,7 @@ model CustomerRequest {
   session     CustomerSession @relation(fields: [sessionId], references: [id])
 
   @@map("customer_requests")
+  @@index([sessionId, createdAt])
 }
 
 model MenuItem {
@@ -134,6 +140,7 @@ model MenuItem {
   menuItemAllergens MenuItemAllergen[]
 
   @@map("menu_items")
+  @@index([restaurantId, isAvailable])
 }
 
 model Allergen {
@@ -167,6 +174,7 @@ model RestaurantKnowledgeBase {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
 
   @@map("restaurant_knowledge_base")
+  @@index([restaurantId, isActive])
 }
 
 model KnowledgeDocument {
@@ -177,15 +185,20 @@ model KnowledgeDocument {
   mimeType         String                   @map("mime_type") @db.VarChar(255)
   fileSize         Int                      @map("file_size")
   status           String                   @db.VarChar(50)
+  publicationStatus String                  @default("DRAFT") @map("publication_status") @db.VarChar(50)
   isActive         Boolean                  @default(true) @map("is_active")
   errorMessage     String?                  @map("error_message") @db.Text
+  validationResults Json?                   @map("validation_results")
+  validatedAt      DateTime?                @map("validated_at")
+  approvedAt       DateTime?                @map("approved_at")
+  publishedAt      DateTime?                @map("published_at")
   createdAt        DateTime?                @map("created_at")
   updatedAt        DateTime?                @map("updated_at")
   restaurant       Restaurant               @relation(fields: [restaurantId], references: [id])
   uploadedBy       StaffUser?               @relation(fields: [uploadedByStaffId], references: [id])
   chunks           KnowledgeDocumentChunk[]
 
-  @@index([restaurantId, status, isActive])
+  @@index([restaurantId, status, publicationStatus, isActive])
   @@index([uploadedByStaffId])
   @@map("knowledge_documents")
 }
@@ -217,13 +230,46 @@ model AiResponseLog {
   handoverRequired  Boolean          @default(false) @map("handover_required")
   handoverReason    String?          @map("handover_reason") @db.Text
   handoverRuleId    Int?             @map("handover_rule_id")
+  instructionVersionId Int?          @map("instruction_version_id")
   createdAt         DateTime?        @map("created_at")
   session           CustomerSession? @relation(fields: [sessionId], references: [id])
   customerMessage   ChatMessage?     @relation("AiCustomerMessageLog", fields: [customerMessageId], references: [id])
   aiMessage         ChatMessage?     @relation("AiMessageLog", fields: [aiMessageId], references: [id])
   handoverRule      HandoverRule?    @relation(fields: [handoverRuleId], references: [id])
+  instructionVersion AiInstructionVersion? @relation(fields: [instructionVersionId], references: [id])
 
+  @@index([instructionVersionId])
+  @@index([sessionId, id])
   @@map("ai_response_logs")
+}
+
+model AiInstructionVersion {
+  id                Int             @id @default(autoincrement())
+  restaurantId      Int             @map("restaurant_id")
+  version           Int
+  status            String          @db.VarChar(50)
+  rolePrompt        String          @map("role_prompt") @db.Text
+  handoverPrompt    String          @map("handover_prompt") @db.Text
+  releaseNotes      String          @map("release_notes") @db.Text
+  validationResults Json?           @map("validation_results")
+  testResults       Json?           @map("test_results")
+  createdByStaffId  Int             @map("created_by_staff_id")
+  approvedByStaffId Int?            @map("approved_by_staff_id")
+  validatedAt       DateTime?       @map("validated_at")
+  testedAt          DateTime?       @map("tested_at")
+  approvedAt        DateTime?       @map("approved_at")
+  publishedAt       DateTime?       @map("published_at")
+  archivedAt        DateTime?       @map("archived_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  restaurant        Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  responseLogs      AiResponseLog[]
+
+  @@unique([restaurantId, version])
+  @@index([restaurantId, status, updatedAt])
+  @@index([createdByStaffId])
+  @@index([approvedByStaffId])
+  @@map("ai_instruction_versions")
 }
 
 model HandoverRule {
@@ -248,11 +294,15 @@ model HandoverRule {
 
 model AuditLog {
   id        Int      @id @default(autoincrement())
+  restaurantId Int?  @map("restaurant_id")
+  actorStaffId Int?   @map("staff_user_id")
   actorType String   @map("actor_type") @db.VarChar(50)
   action    String   @db.VarChar(100)
   metadata  Json?
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([restaurantId, createdAt])
+  @@index([actorStaffId])
   @@map("audit_logs")
 }
 
@@ -266,6 +316,7 @@ model Order {
   orderItems   OrderItem[]
 
   @@map("orders")
+  @@index([sessionId, status, createdAt])
 }
 
 model OrderItem {
@@ -277,6 +328,7 @@ model OrderItem {
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
+  @@index([orderId])
 }
 
 model IngredientCatalog {

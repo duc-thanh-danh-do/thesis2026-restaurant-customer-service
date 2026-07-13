@@ -45,13 +45,31 @@ function serializeMenuItem(item: MenuItemRow): MenuItemActionResult {
   };
 }
 
+async function auditMenuAction(input: {
+  restaurantId: number;
+  actorStaffId: number;
+  action: string;
+  menuItemId: number;
+  metadata?: Record<string, unknown>;
+}) {
+  await prisma.auditLog.create({
+    data: {
+      restaurantId: input.restaurantId,
+      actorStaffId: input.actorStaffId,
+      actorType: "STAFF",
+      action: input.action,
+      metadata: { menuItemId: input.menuItemId, ...input.metadata },
+    },
+  });
+}
+
 export async function createMenuItemAction(data: CreateMenuItemInput) {
-  await requireAdminUser();
+  const staffUser = await requireAdminUser();
 
   try {
     const newItem = await prisma.menuItem.create({
       data: {
-        restaurantId: 1,
+        restaurantId: staffUser.restaurantId,
         name: data.name,
         category: data.category,
         price: data.price,
@@ -62,8 +80,10 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
         isAvailable: true,
       },
     });
+    await auditMenuAction({ restaurantId: staffUser.restaurantId, actorStaffId: staffUser.id, action: "MENU_ITEM_CREATED", menuItemId: newItem.id });
 
     revalidatePath("/menu/admin");
+    revalidatePath("/admin/menu");
 
     return {
       success: true,
@@ -83,11 +103,11 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
 }
 
 export async function getMenuItemsAction(): Promise<MenuItemActionResult[]> {
-  await requireAdminUser();
+  const staffUser = await requireAdminUser();
 
   try {
     const items = await prisma.menuItem.findMany({
-      where: { restaurantId: 1 },
+      where: { restaurantId: staffUser.restaurantId },
       orderBy: { id: "desc" },
     });
 
@@ -102,9 +122,15 @@ export async function getMenuItemsAction(): Promise<MenuItemActionResult[]> {
 
 // Delete Menu
 export async function deleteMenuItemAction(id: number) {
-  await requireAdminUser();
+  const staffUser = await requireAdminUser();
 
   try {
+    const ownedItem = await prisma.menuItem.findFirst({
+      where: { id, restaurantId: staffUser.restaurantId },
+      select: { id: true },
+    });
+    if (!ownedItem) return { success: false, error: "Menu item not found" };
+
     await prisma.menuItemAllergen.deleteMany({
       where: { menuItemId: id },
     });
@@ -112,8 +138,10 @@ export async function deleteMenuItemAction(id: number) {
     await prisma.menuItem.delete({
       where: { id },
     });
+    await auditMenuAction({ restaurantId: staffUser.restaurantId, actorStaffId: staffUser.id, action: "MENU_ITEM_DELETED", menuItemId: id });
 
     revalidatePath("/menu/admin");
+    revalidatePath("/admin/menu");
     return { success: true };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
@@ -133,15 +161,33 @@ export async function toggleMenuItemAvailabilityAction(
   id: number,
   currentStatus: boolean
 ) {
-  await requireAdminUser();
+  const staffUser = await requireAdminUser();
 
   try {
-    await prisma.menuItem.update({
-      where: { id },
-      data: { isAvailable: !currentStatus },
+    const ownedItem = await prisma.menuItem.findFirst({
+      where: { id, restaurantId: staffUser.restaurantId },
+      select: { id: true },
     });
+    if (!ownedItem) return { success: false, error: "Menu item not found" };
+
+    await prisma.$transaction([
+      prisma.menuItem.update({
+        where: { id },
+        data: { isAvailable: !currentStatus },
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: staffUser.restaurantId,
+          actorStaffId: staffUser.id,
+          actorType: "STAFF",
+          action: "MENU_AVAILABILITY_CHANGED",
+          metadata: { menuItemId: id, isAvailable: !currentStatus },
+        },
+      }),
+    ]);
 
     revalidatePath("/menu/admin");
+    revalidatePath("/admin/menu");
     return { success: true };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
@@ -158,9 +204,15 @@ export async function toggleMenuItemAvailabilityAction(
 
 // Edit MenuItem
 export async function editMenuItemAction(id: number, data: EditMenuItemInput) {
-  await requireAdminUser();
+  const staffUser = await requireAdminUser();
 
   try {
+    const ownedItem = await prisma.menuItem.findFirst({
+      where: { id, restaurantId: staffUser.restaurantId },
+      select: { id: true },
+    });
+    if (!ownedItem) return { success: false, error: "Menu item not found" };
+
     const editItem = await prisma.menuItem.update({
       where: { id },
       data: {
@@ -173,8 +225,10 @@ export async function editMenuItemAction(id: number, data: EditMenuItemInput) {
         imageUrl: data.imageUrl,
       },
     });
+    await auditMenuAction({ restaurantId: staffUser.restaurantId, actorStaffId: staffUser.id, action: "MENU_ITEM_UPDATED", menuItemId: id });
 
     revalidatePath("/menu/admin");
+    revalidatePath("/admin/menu");
     return { success: true, data: serializeMenuItem(editItem) };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {

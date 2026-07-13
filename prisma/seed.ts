@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { getSeedStaffPassword } from "../lib/seed-credentials";
 import { Pool } from "pg";
 
 const datasourceUrl =
@@ -219,10 +220,10 @@ async function upsertHandoverRule(
 
 async function main() {
   const restaurant = await upsertRestaurant();
-  const staffPassword = process.env.STAFF_DEFAULT_PASSWORD ?? "staff1234";
+  const staffPassword = getSeedStaffPassword();
   const staffPasswordHash = await bcrypt.hash(staffPassword, 12);
 
-  await prisma.staffUser.upsert({
+  const adminUser = await prisma.staffUser.upsert({
     where: { email: "staff@testpizza.local" },
     update: {
       restaurantId: restaurant.id,
@@ -241,6 +242,39 @@ async function main() {
       createdAt: new Date(),
     },
   });
+
+  const existingInstructionVersion = await prisma.aiInstructionVersion.findFirst({
+    where: { restaurantId: restaurant.id },
+  });
+  if (!existingInstructionVersion) {
+    await prisma.aiInstructionVersion.create({
+      data: {
+        restaurantId: restaurant.id,
+        version: 1,
+        status: "PUBLISHED",
+        rolePrompt:
+          "Help restaurant guests using only structured menu and published knowledge data. Never invent menu items, prices, allergens, ingredients, or availability.",
+        handoverPrompt:
+          "Immediately hand over uncertain allergen or cross-contamination questions, payment disputes, emergencies, complaints requiring a manager, and requests requiring physical staff action.",
+        releaseNotes: "Initial safe production instruction set.",
+        createdByStaffId: adminUser.id,
+        approvedByStaffId: adminUser.id,
+        validationResults: { passed: true, issues: [] },
+        testResults: {
+          passed: true,
+          scenarios: [
+            { name: "Unavailable menu item", passed: true },
+            { name: "Uncertain allergen handover", passed: true },
+            { name: "Payment dispute handover", passed: true },
+          ],
+        },
+        validatedAt: new Date(),
+        testedAt: new Date(),
+        approvedAt: new Date(),
+        publishedAt: new Date(),
+      },
+    });
+  }
 
   for (const tableNumber of ["1", "2"]) {
     await prisma.restaurantTable.upsert({

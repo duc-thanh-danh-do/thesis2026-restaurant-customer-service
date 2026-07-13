@@ -4,6 +4,8 @@ import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ingestKnowledgeDocument } from "@/services/knowledge-document-ingestion.service";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
+import { canPublishKnowledgeDocument } from "@/lib/domain/admin-content";
 
 type KnowledgeDocumentRow = {
   id: number;
@@ -11,8 +13,10 @@ type KnowledgeDocumentRow = {
   mimeType: string;
   fileSize: number;
   status: string;
+  publicationStatus: string;
   isActive: boolean;
   errorMessage: string | null;
+  validationResults: Prisma.JsonValue | null;
   uploadedByName: string | null;
   chunkCount: bigint | number | string;
   createdAt: Date | null;
@@ -25,8 +29,10 @@ export type KnowledgeDocument = {
   mimeType: string;
   fileSize: number;
   status: string;
+  publicationStatus: string;
   isActive: boolean;
   errorMessage: string | null;
+  validationResults: Prisma.JsonValue | null;
   uploadedByName: string | null;
   chunkCount: number;
   createdAt: Date | null;
@@ -52,6 +58,7 @@ export async function uploadKnowledgeDocumentAction(formData: FormData) {
     });
 
     revalidatePath("/knowledge-base");
+    revalidatePath("/admin/knowledge");
     revalidatePath("/settings");
 
     return {
@@ -81,8 +88,10 @@ export async function getKnowledgeDocumentsAction(): Promise<KnowledgeDocument[]
         documents."mime_type" AS "mimeType",
         documents."file_size" AS "fileSize",
         documents."status",
+        documents."publication_status" AS "publicationStatus",
         documents."is_active" AS "isActive",
         documents."error_message" AS "errorMessage",
+        documents."validation_results" AS "validationResults",
         staff_users."name" AS "uploadedByName",
         COUNT(chunks."id") AS "chunkCount",
         documents."created_at" AS "createdAt",
@@ -113,6 +122,13 @@ export async function updateKnowledgeDocumentActiveAction(
 ) {
   try {
     const staffUser = await requireAdminUser();
+    const document = await prisma.knowledgeDocument.findFirst({
+      where: { id: documentId, restaurantId: staffUser.restaurantId },
+    });
+    if (!document) return { success: false, error: "Document was not found." };
+    if (document.publicationStatus !== "PUBLISHED") {
+      return { success: false, error: "Only published documents can be activated." };
+    }
     const result = await prisma.$executeRaw`
       UPDATE "knowledge_documents"
       SET
@@ -129,7 +145,15 @@ export async function updateKnowledgeDocumentActiveAction(
       };
     }
 
+    await writeKnowledgeAudit({
+      restaurantId: staffUser.restaurantId,
+      actorStaffId: staffUser.id,
+      action: isActive ? "KNOWLEDGE_DOCUMENT_ACTIVATED" : "KNOWLEDGE_DOCUMENT_DEACTIVATED",
+      documentId,
+    });
+
     revalidatePath("/knowledge-base");
+    revalidatePath("/admin/knowledge");
     revalidatePath("/settings");
 
     return {
@@ -161,7 +185,15 @@ export async function deleteKnowledgeDocumentAction(documentId: number) {
       };
     }
 
+    await writeKnowledgeAudit({
+      restaurantId: staffUser.restaurantId,
+      actorStaffId: staffUser.id,
+      action: "KNOWLEDGE_DOCUMENT_DELETED",
+      documentId,
+    });
+
     revalidatePath("/knowledge-base");
+    revalidatePath("/admin/knowledge");
     revalidatePath("/settings");
 
     return {
@@ -175,4 +207,132 @@ export async function deleteKnowledgeDocumentAction(documentId: number) {
       error: "Failed to delete knowledge document.",
     };
   }
+}
+
+async function writeKnowledgeAudit(input: {
+  restaurantId: number;
+  actorStaffId: number;
+  action: string;
+  documentId: number;
+}) {
+  await prisma.auditLog.create({
+    data: {
+      restaurantId: input.restaurantId,
+      actorStaffId: input.actorStaffId,
+      actorType: "STAFF",
+      action: input.action,
+      metadata: { documentId: input.documentId },
+    },
+  });
+}
+
+function revalidateKnowledgeAdmin() {
+  revalidatePath("/knowledge-base");
+  revalidatePath("/admin");
+  revalidatePath("/admin/knowledge");
+}
+
+export async function validateKnowledgeDocumentAction(documentId: number) {
+  const staffUser = await requireAdminUser();
+  const document = await prisma.knowledgeDocument.findFirst({
+    where: { id: documentId, restaurantId: staffUser.restaurantId },
+    include: { _count: { select: { chunks: true } } },
+  });
+  if (!document) return { success: false, error: "Document was not found." };
+
+  const issues: Array<{ severity: "BLOCKING"; message: string }> = [];
+  if (document.status !== "ready") {
+    issues.push({ severity: "BLOCKING", message: "Document ingestion must complete successfully." });
+  }
+  if (document._count.chunks === 0) {
+    issues.push({ severity: "BLOCKING", message: "Document must contain at least one retrievable chunk." });
+  }
+  const validation = { passed: issues.length === 0, issues, chunkCount: document._count.chunks };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.knowledgeDocument.update({
+      where: { id: document.id },
+      data: {
+        publicationStatus: validation.passed ? "VALIDATED" : "DRAFT",
+        validationResults: validation,
+        validatedAt: validation.passed ? new Date() : null,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        restaurantId: staffUser.restaurantId,
+        actorStaffId: staffUser.id,
+        actorType: "STAFF",
+        action: validation.passed ? "KNOWLEDGE_DOCUMENT_VALIDATED" : "KNOWLEDGE_DOCUMENT_VALIDATION_FAILED",
+        metadata: { documentId: document.id, issues: issues.length },
+      },
+    });
+  });
+  revalidateKnowledgeAdmin();
+  return { success: validation.passed, validation, error: validation.passed ? undefined : issues[0]?.message };
+}
+
+export async function approveKnowledgeDocumentAction(documentId: number) {
+  const staffUser = await requireAdminUser();
+  const document = await prisma.knowledgeDocument.findFirst({
+    where: { id: documentId, restaurantId: staffUser.restaurantId },
+  });
+  if (!document) return { success: false, error: "Document was not found." };
+  if (document.publicationStatus !== "VALIDATED") {
+    return { success: false, error: "Only a validated document can be approved." };
+  }
+  await prisma.knowledgeDocument.update({
+    where: { id: document.id },
+    data: { publicationStatus: "APPROVED", approvedAt: new Date() },
+  });
+  await writeKnowledgeAudit({
+    restaurantId: staffUser.restaurantId,
+    actorStaffId: staffUser.id,
+    action: "KNOWLEDGE_DOCUMENT_APPROVED",
+    documentId: document.id,
+  });
+  revalidateKnowledgeAdmin();
+  return { success: true };
+}
+
+export async function publishKnowledgeDocumentAction(documentId: number) {
+  const staffUser = await requireAdminUser();
+  const document = await prisma.knowledgeDocument.findFirst({
+    where: { id: documentId, restaurantId: staffUser.restaurantId },
+  });
+  if (!document) return { success: false, error: "Document was not found." };
+  const validation = document.validationResults as { passed?: boolean } | null;
+  if (!canPublishKnowledgeDocument({
+    ingestionStatus: document.status,
+    publicationStatus: document.publicationStatus,
+    validationPassed: validation?.passed === true,
+  })) {
+    return { success: false, error: "Only a ready, validated, and approved document can be published." };
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.knowledgeDocument.updateMany({
+      where: {
+        restaurantId: staffUser.restaurantId,
+        originalFilename: document.originalFilename,
+        publicationStatus: "PUBLISHED",
+        id: { not: document.id },
+      },
+      data: { publicationStatus: "ARCHIVED", isActive: false },
+    });
+    await tx.knowledgeDocument.update({
+      where: { id: document.id },
+      data: { publicationStatus: "PUBLISHED", isActive: true, publishedAt: new Date() },
+    });
+    await tx.auditLog.create({
+      data: {
+        restaurantId: staffUser.restaurantId,
+        actorStaffId: staffUser.id,
+        actorType: "STAFF",
+        action: "KNOWLEDGE_DOCUMENT_PUBLISHED",
+        metadata: { documentId: document.id },
+      },
+    });
+  });
+  revalidateKnowledgeAdmin();
+  return { success: true };
 }

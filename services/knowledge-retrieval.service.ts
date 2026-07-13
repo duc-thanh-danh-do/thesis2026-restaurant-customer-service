@@ -319,6 +319,7 @@ async function retrieveDocumentChunksByVector({
         ON documents."id" = chunks."document_id"
       WHERE documents."restaurant_id" = ${restaurantId}
         AND documents."status" = 'ready'
+        AND documents."publication_status" = 'PUBLISHED'
         AND documents."is_active" = true
         AND chunks."embedding" IS NOT NULL
       ORDER BY chunks."embedding" <=> ${queryVector}::vector, chunks."id" ASC
@@ -368,6 +369,7 @@ async function retrieveDocumentChunksByKeyword({
       ON documents."id" = chunks."document_id"
     WHERE documents."restaurant_id" = ${restaurantId}
       AND documents."status" = 'ready'
+      AND documents."publication_status" = 'PUBLISHED'
       AND documents."is_active" = true
       AND (
         to_tsvector('simple', documents."original_filename" || ' ' || chunks."content")
