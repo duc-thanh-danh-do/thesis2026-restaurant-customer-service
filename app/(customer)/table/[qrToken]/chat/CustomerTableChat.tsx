@@ -435,7 +435,7 @@ export default function CustomerTableChat({
         activeTab="chat"
         basePath={basePath}
         cartCount={cartCount > 0 ? cartCount : undefined}
-        orderCount={1}
+        orderCount={undefined}
       />
     </CustomerMobileLayout>
   );

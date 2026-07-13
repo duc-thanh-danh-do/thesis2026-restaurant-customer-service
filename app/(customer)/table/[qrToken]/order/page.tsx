@@ -326,7 +326,7 @@ export default function OrderPage() {
         activeTab="order"
         basePath={basePath}
         cartCount={cartCount > 0 ? cartCount : undefined}
-        orderCount={1}
+        orderCount={orders.length > 0 ? orders.length : undefined}
       />
     </CustomerMobileLayout>
   );
