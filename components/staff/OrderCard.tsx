@@ -74,7 +74,7 @@ export default function OrderCard({
     try {
       const result = await updateOrderStatus(numericOrderId, nextStatus);
 
-      if (!result.success) {
+      if (!result.success || !("status" in result)) {
         setOptimisticStatus(previousStatus);
         setError(result.error ?? "Unable to update order status.");
         return;

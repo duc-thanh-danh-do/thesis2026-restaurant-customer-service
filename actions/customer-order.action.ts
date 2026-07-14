@@ -4,6 +4,7 @@ import { getCurrentStaffUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { revalidatePath } from "next/cache";
+import { ORDER_STATUS, type OrderStatus } from "@/constants/orderStatus";
 
 type OrderItemRow = {
   id: number;
@@ -20,6 +21,13 @@ const CLOSED_ORDER_STATUSES = [
 ];
 const ACTIVE_SESSION_STATUSES = ["active", "waiting_staff"];
 
+const STAFF_ORDER_TRANSITIONS: Record<Exclude<OrderStatus, "unconfirmed">, OrderStatus[]> = {
+  placed: ["preparing"],
+  preparing: ["ready"],
+  ready: ["served"],
+  served: [],
+};
+
 function normalizeOrderStatus(status: string) {
   const normalized = status.trim().toLowerCase();
 
@@ -34,7 +42,14 @@ function normalizeOrderStatus(status: string) {
 }
 
 export async function updateOrderStatus(orderId: number, status: string) {
-  const nextStatus = normalizeOrderStatus(status);
+  const requestedStatus = status.trim().toLowerCase();
+
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return { success: false, error: "Invalid order id." };
+  }
+  if (!ORDER_STATUS.includes(requestedStatus as OrderStatus) || requestedStatus === "unconfirmed") {
+    return { success: false, error: "Unsupported order status." };
+  }
 
   try {
     const staffUser = await getCurrentStaffUser();
@@ -43,28 +58,27 @@ export async function updateOrderStatus(orderId: number, status: string) {
       return { success: false, error: "Staff sign in is required." };
     }
 
-    const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        session: {
-          restaurantId: staffUser.restaurantId,
-        },
-      },
-      select: { id: true },
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${orderId})`;
+      const order = await tx.order.findFirst({
+        where: { id: orderId, session: { restaurantId: staffUser.restaurantId } },
+        select: { id: true, status: true },
+      });
+
+      if (!order) return { success: false as const, error: "Order not found." };
+      if (!STAFF_ORDER_TRANSITIONS[order.status as Exclude<OrderStatus, "unconfirmed">]?.includes(requestedStatus as OrderStatus)) {
+        return { success: false as const, error: "Invalid order status transition." };
+      }
+
+      await tx.order.update({ where: { id: order.id }, data: { status: requestedStatus } });
+      return { success: true as const, status: normalizeOrderStatus(requestedStatus) };
     });
 
-    if (!order) {
-      return { success: false, error: "Order not found." };
-    }
-
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: nextStatus },
-    });
+    if (!result.success) return result;
 
     revalidatePath("/dashboard");
 
-    return { success: true, status: nextStatus };
+    return result;
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
       return {
@@ -163,6 +177,18 @@ export async function updateItemQuantityAction(
   itemId: number,
   newQuantity: number,
 ) {
+  if (
+    !Number.isInteger(orderId) ||
+    orderId <= 0 ||
+    !Number.isInteger(itemId) ||
+    itemId <= 0 ||
+    !Number.isInteger(newQuantity) ||
+    newQuantity < 0 ||
+    newQuantity > 100
+  ) {
+    return { success: false, error: "Invalid order item quantity." };
+  }
+
   try {
     const staffUser = await getCurrentStaffUser();
 
@@ -170,55 +196,38 @@ export async function updateItemQuantityAction(
       return { success: false, error: "Staff sign in is required." };
     }
 
-    const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        session: {
-          restaurantId: staffUser.restaurantId,
-        },
-      },
-      select: { id: true },
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${orderId})`;
+      const order = await tx.order.findFirst({
+        where: { id: orderId, session: { restaurantId: staffUser.restaurantId } },
+        select: { id: true },
+      });
+      if (!order) return { success: false as const, error: "Order not found." };
+
+      if (newQuantity === 0) {
+        const deleted = await tx.orderItem.deleteMany({ where: { id: itemId, orderId: order.id } });
+        if (deleted.count === 0) return { success: false as const, error: "Order item not found." };
+      } else {
+        const updated = await tx.orderItem.updateMany({
+          where: { id: itemId, orderId: order.id },
+          data: { quantity: newQuantity },
+        });
+        if (updated.count === 0) return { success: false as const, error: "Order item not found." };
+      }
+
+      const updatedItems = (await tx.orderItem.findMany({ where: { orderId: order.id } })) as OrderItemRow[];
+      const newTotal = updatedItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+      if (!Number.isFinite(newTotal) || newTotal < 0 || newTotal > 99_999_999.99) {
+        throw new Error("Order total exceeds the supported limit.");
+      }
+      await tx.order.update({ where: { id: order.id }, data: { total: newTotal } });
+      return { success: true as const };
     });
 
-    if (!order) {
-      return { success: false, error: "Order not found." };
-    }
-
-    if (newQuantity <= 0) {
-      const deleted = await prisma.orderItem.deleteMany({
-        where: { id: itemId, orderId: order.id },
-      });
-
-      if (deleted.count === 0) {
-        return { success: false, error: "Order item not found." };
-      }
-    } else {
-      const updated = await prisma.orderItem.updateMany({
-        where: { id: itemId, orderId: order.id },
-        data: { quantity: newQuantity },
-      });
-
-      if (updated.count === 0) {
-        return { success: false, error: "Order item not found." };
-      }
-    }
-
-    const updatedItems = (await prisma.orderItem.findMany({
-      where: { orderId: order.id },
-    })) as OrderItemRow[];
-    const newTotal = updatedItems.reduce(
-      (sum, item) => sum + Number(item.price) * item.quantity,
-      0,
-    );
-
-    // update total price
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { total: newTotal },
-    });
+    if (!result.success) return result;
 
     revalidatePath("/dashboard");
-    return { success: true };
+    return result;
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
       return {

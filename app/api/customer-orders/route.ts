@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { HttpError, toErrorResponse } from "@/lib/http-errors";
 import { createUnconfirmedOrder } from "@/services/customer-order.service";
+import { createCustomerOrderSchema } from "@/lib/validation";
 
 const ACTIVE_SESSION_STATUSES = ["active", "waiting_staff"];
 
@@ -84,25 +85,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {
-      qrToken?: string;
-      sessionToken?: string | null;
-      items?: Record<string, number>;
-    };
-
-    const qrToken = body.qrToken;
-
-    if (!qrToken)
-      throw new HttpError("QR token is required", "QR_TOKEN_REQUIRED", 400);
-    if (!body.items)
-      throw new HttpError(
-        "Order items are required",
-        "ORDER_ITEMS_REQUIRED",
-        400,
-      );
+    const body = createCustomerOrderSchema.parse(await request.json());
 
     const { order, sessionToken } = await createUnconfirmedOrder({
-      qrToken,
+      qrToken: body.qrToken,
       sessionToken: body.sessionToken,
       items: body.items,
     });

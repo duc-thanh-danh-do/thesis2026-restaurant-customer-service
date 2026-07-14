@@ -5,9 +5,10 @@ import {
   serializeOrderDraft,
   updateDraftOrderItemQuantity,
 } from "@/services/customer-order.service";
+import { updateCustomerOrderSchema } from "@/lib/validation";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ orderId: string }> },
 ) {
   try {
@@ -18,8 +19,16 @@ export async function GET(
       throw new HttpError("Invalid order id", "INVALID_ORDER_ID", 400);
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: parsedOrderId },
+    const sessionToken = new URL(request.url).searchParams.get("sessionToken")?.trim();
+    if (!sessionToken) {
+      throw new HttpError("Session token is required", "SESSION_TOKEN_REQUIRED", 400);
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        id: parsedOrderId,
+        session: { sessionToken },
+      },
       include: {
         orderItems: {
           orderBy: { id: "asc" },
@@ -61,14 +70,13 @@ export async function PATCH(
   try {
     const { orderId } = await params;
     const parsedOrderId = Number(orderId);
-    const body = (await request.json()) as {
-      action?: string;
-      itemId?: number;
-      quantity?: number;
-    };
+    if (!Number.isInteger(parsedOrderId)) {
+      throw new HttpError("Invalid order id", "INVALID_ORDER_ID", 400);
+    }
+    const body = updateCustomerOrderSchema.parse(await request.json());
 
     if (body.action === "confirm") {
-      const order = await confirmOrder(parsedOrderId);
+      const order = await confirmOrder(parsedOrderId, body.sessionToken);
 
       return Response.json({
         order: serializeOrderDraft(order),
@@ -78,8 +86,9 @@ export async function PATCH(
     if (body.action === "update_item_quantity") {
       const order = await updateDraftOrderItemQuantity({
         orderId: parsedOrderId,
-        itemId: Number(body.itemId),
-        quantity: Number(body.quantity),
+        itemId: body.itemId,
+        quantity: body.quantity,
+        sessionToken: body.sessionToken,
       });
 
       return Response.json({

@@ -13,7 +13,7 @@ export const createUnconfirmedOrderToolSchema = z.object({
     .array(
       z.object({
         menuItemId: z.number().int().positive(),
-        quantity: z.number().int().positive(),
+        quantity: z.number().int().min(1).max(100),
       }),
     )
     .min(1),

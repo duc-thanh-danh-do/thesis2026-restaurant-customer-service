@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { HttpError } from "@/lib/http-errors";
 import { createCustomerSession } from "@/services/customer-session.service";
 import {
@@ -7,6 +8,9 @@ import {
 } from "@/constants/orderStatus";
 
 const ACTIVE_SESSION_STATUSES = ["active", "waiting_staff"] as const;
+const MAX_ORDER_ITEM_QUANTITY = 100;
+const MAX_ORDER_ITEM_TYPES = 50;
+const MAX_ORDER_TOTAL = 99_999_999.99;
 
 export type CreateUnconfirmedOrderInput = {
   qrToken: string;
@@ -16,15 +20,76 @@ export type CreateUnconfirmedOrderInput = {
 
 type OrderWithItems = Awaited<ReturnType<typeof getOrderWithItems>>;
 
-function getOrderWithItems(orderId: number) {
-  return prisma.order.findUnique({
-    where: { id: orderId },
+function getOrderWithItems(
+  client: Prisma.TransactionClient,
+  orderId: number,
+  sessionToken: string,
+) {
+  return client.order.findFirst({
+    where: {
+      id: orderId,
+      session: { sessionToken },
+    },
     include: {
       orderItems: {
         orderBy: { id: "asc" },
       },
     },
   });
+}
+
+function calculateOrderTotal(items: Array<{ price: unknown; quantity: number }>) {
+  const total = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+
+  if (!Number.isFinite(total) || total < 0 || total > MAX_ORDER_TOTAL) {
+    throw new HttpError("Order total exceeds the supported limit", "ORDER_TOTAL_INVALID", 400);
+  }
+
+  return total;
+}
+
+export function normalizeRequestedOrderItems(items: Record<string, number>) {
+  const requestedItems = Object.entries(items).map(([itemId, quantity]) => ({
+    id: Number(itemId),
+    quantity,
+  }));
+
+  if (requestedItems.length === 0 || requestedItems.length > MAX_ORDER_ITEM_TYPES) {
+    throw new HttpError("Order must contain between 1 and 50 item types", "ORDER_ITEMS_INVALID", 400);
+  }
+
+  if (
+    requestedItems.some(
+      (item) =>
+        !Number.isInteger(item.id) ||
+        item.id <= 0 ||
+        !Number.isInteger(item.quantity) ||
+        item.quantity < 1 ||
+        item.quantity > MAX_ORDER_ITEM_QUANTITY,
+    )
+  ) {
+    throw new HttpError("Order quantities must be whole numbers between 1 and 100", "ORDER_ITEMS_INVALID", 400);
+  }
+
+  return requestedItems;
+}
+
+export function assertOrderItemTypeLimit(
+  existingItemNames: Iterable<string>,
+  incomingItemNames: Iterable<string>,
+) {
+  const distinctItemNames = new Set([
+    ...existingItemNames,
+    ...incomingItemNames,
+  ]);
+
+  if (distinctItemNames.size > MAX_ORDER_ITEM_TYPES) {
+    throw new HttpError(
+      "An order cannot contain more than 50 item types",
+      "ORDER_ITEM_TYPES_EXCEEDED",
+      400,
+    );
+  }
 }
 
 export function serializeOrderDraft(order: NonNullable<OrderWithItems>) {
@@ -56,16 +121,7 @@ export async function createUnconfirmedOrder({
 
   if (!table) throw new HttpError("Restaurant table not found", "TABLE_NOT_FOUND", 404);
 
-  const requestedItems = Object.entries(items)
-    .map(([itemId, quantity]) => ({
-      id: Number(itemId),
-      quantity,
-    }))
-    .filter((item) => Number.isInteger(item.id) && item.quantity > 0);
-
-  if (requestedItems.length === 0) {
-    throw new HttpError("Order has no valid items", "ORDER_EMPTY", 400);
-  }
+  const requestedItems = normalizeRequestedOrderItems(items);
 
   const menuItems = await prisma.menuItem.findMany({
     where: {
@@ -80,8 +136,8 @@ export async function createUnconfirmedOrder({
     },
   });
 
-  if (menuItems.length === 0) {
-    throw new HttpError("Order has no available menu items", "ORDER_EMPTY", 400);
+  if (menuItems.length !== requestedItems.length) {
+    throw new HttpError("One or more requested menu items are unavailable", "ORDER_ITEM_UNAVAILABLE", 409);
   }
 
   const session = sessionToken
@@ -109,111 +165,93 @@ export async function createUnconfirmedOrder({
     })
     .filter((item) => item.quantity > 0);
 
-  const total = orderItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${activeSession.id})`;
 
-  const existingDraft = await prisma.order.findFirst({
-    where: {
-      sessionId: activeSession.id,
-      status: CUSTOMER_DRAFT_ORDER_STATUS,
-    },
-    include: {
-      orderItems: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+    const existingDraft = await tx.order.findFirst({
+      where: {
+        sessionId: activeSession.id,
+        status: CUSTOMER_DRAFT_ORDER_STATUS,
+      },
+      include: { orderItems: true },
+      orderBy: { createdAt: "desc" },
+    });
 
-  if (existingDraft) {
+    if (!existingDraft) {
+      const order = await tx.order.create({
+        data: {
+          sessionId: activeSession.id,
+          status: CUSTOMER_DRAFT_ORDER_STATUS,
+          total: calculateOrderTotal(orderItems),
+          orderItems: { create: orderItems },
+        },
+        include: { orderItems: true },
+      });
+      return { order, sessionToken: activeSession.sessionToken };
+    }
+
+    const existingItemsByName = new Map(
+      existingDraft.orderItems.map((item) => [item.name, item]),
+    );
+    assertOrderItemTypeLimit(
+      existingItemsByName.keys(),
+      orderItems.map((item) => item.name),
+    );
     for (const item of orderItems) {
-      const existingItem = existingDraft.orderItems.find(
-        (orderItem) => orderItem.name === item.name,
-      );
-
+      const existingItem = existingItemsByName.get(item.name);
       if (existingItem) {
-        await prisma.orderItem.update({
+        const nextQuantity = existingItem.quantity + item.quantity;
+        if (nextQuantity > MAX_ORDER_ITEM_QUANTITY) {
+          throw new HttpError("An item quantity cannot exceed 100", "ORDER_QUANTITY_INVALID", 400);
+        }
+        await tx.orderItem.update({
           where: { id: existingItem.id },
-          data: { quantity: existingItem.quantity + item.quantity },
+          data: { quantity: { increment: item.quantity } },
         });
       } else {
-        await prisma.orderItem.create({
-          data: {
-            orderId: existingDraft.id,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-          },
+        await tx.orderItem.create({
+          data: { orderId: existingDraft.id, ...item },
         });
       }
     }
 
-    const updatedItems = await prisma.orderItem.findMany({
-      where: { orderId: existingDraft.id },
-    });
-    const updatedTotal = updatedItems.reduce(
-      (sum, item) => sum + Number(item.price) * item.quantity,
-      0,
-    );
-
-    const updatedDraft = await prisma.order.update({
+    const updatedItems = await tx.orderItem.findMany({ where: { orderId: existingDraft.id } });
+    const updatedDraft = await tx.order.update({
       where: { id: existingDraft.id },
-      data: { total: updatedTotal },
-      include: {
-        orderItems: {
-          orderBy: { id: "asc" },
-        },
-      },
+      data: { total: calculateOrderTotal(updatedItems) },
+      include: { orderItems: { orderBy: { id: "asc" } } },
     });
 
-    return {
-      order: updatedDraft,
-      sessionToken: activeSession.sessionToken,
-    };
-  }
-
-  const order = await prisma.order.create({
-    data: {
-      sessionId: activeSession.id,
-      status: CUSTOMER_DRAFT_ORDER_STATUS,
-      total,
-      orderItems: {
-        create: orderItems,
-      },
-    },
-    include: {
-      orderItems: true,
-    },
+    return { order: updatedDraft, sessionToken: activeSession.sessionToken };
   });
-
-  return {
-    order,
-    sessionToken: activeSession.sessionToken,
-  };
 }
 
-export async function confirmOrder(orderId: number) {
+export async function confirmOrder(orderId: number, sessionToken: string) {
   if (!Number.isInteger(orderId)) {
     throw new HttpError("Invalid order id", "INVALID_ORDER_ID", 400);
   }
 
-  const order = await getOrderWithItems(orderId);
-
-  if (!order) throw new HttpError("Order not found", "ORDER_NOT_FOUND", 404);
-  if (order.status !== CUSTOMER_DRAFT_ORDER_STATUS) {
-    throw new HttpError("Only unconfirmed orders can be confirmed", "ORDER_NOT_UNCONFIRMED", 400);
+  if (!sessionToken.trim()) {
+    throw new HttpError("Session token is required", "SESSION_TOKEN_REQUIRED", 400);
   }
 
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: CUSTOMER_CONFIRMED_ORDER_STATUS },
-    include: {
-      orderItems: {
-        orderBy: { id: "asc" },
-      },
-    },
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${orderId})`;
+    const order = await getOrderWithItems(tx, orderId, sessionToken);
+
+    if (!order) throw new HttpError("Order not found", "ORDER_NOT_FOUND", 404);
+    if (order.status !== CUSTOMER_DRAFT_ORDER_STATUS) {
+      throw new HttpError("Only unconfirmed orders can be confirmed", "ORDER_NOT_UNCONFIRMED", 400);
+    }
+    if (order.orderItems.length === 0) {
+      throw new HttpError("An empty order cannot be confirmed", "ORDER_EMPTY", 400);
+    }
+
+    return tx.order.update({
+      where: { id: orderId },
+      data: { status: CUSTOMER_CONFIRMED_ORDER_STATUS },
+      include: { orderItems: { orderBy: { id: "asc" } } },
+    });
   });
 }
 
@@ -221,10 +259,12 @@ export async function updateDraftOrderItemQuantity({
   orderId,
   itemId,
   quantity,
+  sessionToken,
 }: {
   orderId: number;
   itemId: number;
   quantity: number;
+  sessionToken: string;
 }) {
   if (!Number.isInteger(orderId)) {
     throw new HttpError("Invalid order id", "INVALID_ORDER_ID", 400);
@@ -234,48 +274,39 @@ export async function updateDraftOrderItemQuantity({
     throw new HttpError("Invalid order item id", "INVALID_ORDER_ITEM_ID", 400);
   }
 
-  if (!Number.isInteger(quantity) || quantity < 0) {
+  if (!Number.isInteger(quantity) || quantity < 0 || quantity > MAX_ORDER_ITEM_QUANTITY) {
     throw new HttpError("Invalid quantity", "INVALID_QUANTITY", 400);
   }
 
-  const order = await getOrderWithItems(orderId);
-
-  if (!order) throw new HttpError("Order not found", "ORDER_NOT_FOUND", 404);
-  if (order.status !== CUSTOMER_DRAFT_ORDER_STATUS) {
-    throw new HttpError("Only unconfirmed orders can be edited", "ORDER_NOT_UNCONFIRMED", 400);
+  if (!sessionToken.trim()) {
+    throw new HttpError("Session token is required", "SESSION_TOKEN_REQUIRED", 400);
   }
 
-  const orderItem = order.orderItems.find((item) => item.id === itemId);
-  if (!orderItem) {
-    throw new HttpError("Order item not found", "ORDER_ITEM_NOT_FOUND", 404);
-  }
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${orderId})`;
+    const order = await getOrderWithItems(tx, orderId, sessionToken);
 
-  if (quantity === 0) {
-    await prisma.orderItem.delete({
-      where: { id: itemId },
+    if (!order) throw new HttpError("Order not found", "ORDER_NOT_FOUND", 404);
+    if (order.status !== CUSTOMER_DRAFT_ORDER_STATUS) {
+      throw new HttpError("Only unconfirmed orders can be edited", "ORDER_NOT_UNCONFIRMED", 400);
+    }
+
+    const orderItem = order.orderItems.find((item) => item.id === itemId);
+    if (!orderItem) {
+      throw new HttpError("Order item not found", "ORDER_ITEM_NOT_FOUND", 404);
+    }
+
+    if (quantity === 0) {
+      await tx.orderItem.delete({ where: { id: itemId } });
+    } else {
+      await tx.orderItem.update({ where: { id: itemId }, data: { quantity } });
+    }
+
+    const updatedItems = await tx.orderItem.findMany({ where: { orderId } });
+    return tx.order.update({
+      where: { id: orderId },
+      data: { total: calculateOrderTotal(updatedItems) },
+      include: { orderItems: { orderBy: { id: "asc" } } },
     });
-  } else {
-    await prisma.orderItem.update({
-      where: { id: itemId },
-      data: { quantity },
-    });
-  }
-
-  const updatedItems = await prisma.orderItem.findMany({
-    where: { orderId },
-  });
-  const updatedTotal = updatedItems.reduce(
-    (sum, item) => sum + Number(item.price) * item.quantity,
-    0,
-  );
-
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { total: updatedTotal },
-    include: {
-      orderItems: {
-        orderBy: { id: "asc" },
-      },
-    },
   });
 }
