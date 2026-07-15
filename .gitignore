@@ -15,3 +15,16 @@ tsconfig.tsbuildinfo
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Repository-owned TDD coverage (a developer may locally exclude the wider tests tree).
+!tests/
+tests/*
+!tests/admin-content-domain.test.ts
+!tests/customer-order-validation.test.ts
+!tests/security-hardening.test.ts
+!tests/e2e/
+tests/e2e/*
+!tests/e2e/admin-backend.spec.ts
+!tests/fixtures/
+tests/fixtures/*
+!tests/fixtures/admin-e2e-policy.md

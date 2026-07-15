@@ -25,6 +25,9 @@ export function toErrorResponse(error: unknown) {
     );
   }
 
-  const message = error instanceof Error ? error.message : "Unexpected error";
-  return Response.json({ message, code: "INTERNAL_ERROR" }, { status: 500 });
+  console.error("Unexpected request error", error);
+  return Response.json(
+    { message: "An unexpected server error occurred.", code: "INTERNAL_ERROR" },
+    { status: 500 },
+  );
 }

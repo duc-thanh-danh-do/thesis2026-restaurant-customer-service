@@ -7,6 +7,15 @@ export function getConfiguredAppBaseUrl() {
   return configuredBaseUrl ?? vercelBaseUrl ?? "http://localhost:3000";
 }
 
+function getTrustedHosts() {
+  return new Set(
+    (process.env.TRUSTED_APP_HOSTS ?? "")
+      .split(",")
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 const SAFE_HOST_PATTERN =
   /^(?:localhost|127\.0\.0\.1|\[[^\]\s]+\]|[A-Za-z0-9.-]+)(?::\d{1,5})?$/;
 
@@ -21,10 +30,23 @@ function isSafeHost(host: string) {
 }
 
 export function getAppBaseUrlFromHeaders(headersList: Headers) {
+  const configuredBaseUrl = getConfiguredAppBaseUrl();
+
+  if (process.env.TRUST_PROXY_HEADERS !== "true") {
+    return configuredBaseUrl;
+  }
+
   const forwardedHost = headersList.get("x-forwarded-host");
   const host = forwardedHost ?? headersList.get("host");
+  const trustedHosts = getTrustedHosts();
 
-  if (!host || !isSafeHost(host)) return getConfiguredAppBaseUrl();
+  if (
+    !host ||
+    !isSafeHost(host) ||
+    !trustedHosts.has(host.toLowerCase())
+  ) {
+    return configuredBaseUrl;
+  }
 
   const forwardedProto = headersList.get("x-forwarded-proto");
   const protocol =
@@ -33,7 +55,7 @@ export function getAppBaseUrlFromHeaders(headersList: Headers) {
       ? "http"
       : "https");
 
-  if (!isSafeProtocol(protocol)) return getConfiguredAppBaseUrl();
+  if (!isSafeProtocol(protocol)) return configuredBaseUrl;
 
   return `${protocol}://${host}`;
 }

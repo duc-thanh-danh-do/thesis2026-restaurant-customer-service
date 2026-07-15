@@ -1,5 +1,9 @@
 import type { MenuItemDto } from "@/types/menu-item";
 
+export function canUseCustomerFallbackData() {
+  return process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+}
+
 export const fallbackRestaurant = {
   id: 1,
   name: "TestPizza",

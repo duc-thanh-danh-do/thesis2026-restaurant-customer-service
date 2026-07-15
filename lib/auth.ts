@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { STAFF_ROLES, type StaffRole } from "@/constants/roles";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
+import { getConfiguredStaffSessionSecret } from "@/lib/env";
 
 type StaffUserWithRole = {
   role: string | null;
@@ -13,8 +14,18 @@ export function getStaffSessionCookieName() {
   return process.env.STAFF_SESSION_COOKIE ?? "staff_session";
 }
 
+export function getStaffSessionTtlSeconds() {
+  const configured = Number(process.env.STAFF_SESSION_TTL_SECONDS ?? 60 * 60 * 12);
+
+  if (!Number.isInteger(configured) || configured <= 0 || configured > 60 * 60 * 24 * 7) {
+    throw new Error("STAFF_SESSION_TTL_SECONDS must be an integer between 1 and 604800.");
+  }
+
+  return configured;
+}
+
 function getStaffSessionSecret() {
-  const secret = process.env.STAFF_SESSION_SECRET ?? process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const secret = getConfiguredStaffSessionSecret();
 
   if (!secret && process.env.NODE_ENV === "production") {
     throw new Error("STAFF_SESSION_SECRET, AUTH_SECRET, or NEXTAUTH_SECRET is required in production.");
@@ -23,23 +34,39 @@ function getStaffSessionSecret() {
   return secret ?? "development-staff-session-secret";
 }
 
-function signStaffSessionValue(staffUserId: number) {
-  return createHmac("sha256", getStaffSessionSecret()).update(String(staffUserId)).digest("hex");
+function signStaffSessionValue(staffUserId: number, issuedAt: number) {
+  return createHmac("sha256", getStaffSessionSecret())
+    .update(`${staffUserId}.${issuedAt}`)
+    .digest("hex");
 }
 
-export function createStaffSessionCookieValue(staffUserId: number) {
-  return `${staffUserId}.${signStaffSessionValue(staffUserId)}`;
+export function createStaffSessionCookieValue(staffUserId: number, issuedAt = Math.floor(Date.now() / 1000)) {
+  return `${staffUserId}.${issuedAt}.${signStaffSessionValue(staffUserId, issuedAt)}`;
 }
 
-export function verifyStaffSessionCookieValue(value: string | undefined) {
+export function verifyStaffSessionCookieValue(
+  value: string | undefined,
+  now = Math.floor(Date.now() / 1000),
+) {
   if (!value) return null;
 
-  const [idPart, signature] = value.split(".");
+  const [idPart, issuedAtPart, signature] = value.split(".");
   const staffUserId = Number(idPart);
+  const issuedAt = Number(issuedAtPart);
 
-  if (!Number.isInteger(staffUserId) || staffUserId <= 0 || !signature) return null;
+  if (
+    !Number.isInteger(staffUserId) ||
+    staffUserId <= 0 ||
+    !Number.isInteger(issuedAt) ||
+    issuedAt <= 0 ||
+    !signature ||
+    issuedAt > now + 60 ||
+    now - issuedAt > getStaffSessionTtlSeconds()
+  ) {
+    return null;
+  }
 
-  const expected = signStaffSessionValue(staffUserId);
+  const expected = signStaffSessionValue(staffUserId, issuedAt);
   const signatureBuffer = Buffer.from(signature, "hex");
   const expectedBuffer = Buffer.from(expected, "hex");
 
