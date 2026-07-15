@@ -19,6 +19,7 @@ model Restaurant {
   staffUsers    StaffUser[]
   menuItems     MenuItem[]
   knowledgeBase RestaurantKnowledgeBase[]
+  handoverRules HandoverRule[]
 
   ingredientCatalogs IngredientCatalog[]
   dietaryCatalogs    DietaryCatalog[]
@@ -176,12 +177,35 @@ model AiResponseLog {
   prompt            String?          @db.Text
   response          String?          @db.Text
   handoverRequired  Boolean          @default(false) @map("handover_required")
+  handoverReason    String?          @map("handover_reason") @db.Text
+  handoverRuleId    Int?             @map("handover_rule_id")
   createdAt         DateTime?        @map("created_at")
   session           CustomerSession? @relation(fields: [sessionId], references: [id])
   customerMessage   ChatMessage?     @relation("AiCustomerMessageLog", fields: [customerMessageId], references: [id])
   aiMessage         ChatMessage?     @relation("AiMessageLog", fields: [aiMessageId], references: [id])
+  handoverRule      HandoverRule?    @relation(fields: [handoverRuleId], references: [id])
 
   @@map("ai_response_logs")
+}
+
+model HandoverRule {
+  id              Int             @id @default(autoincrement())
+  restaurantId    Int             @map("restaurant_id")
+  name            String          @db.VarChar(255)
+  category        String          @db.VarChar(100)
+  requestType     String          @map("request_type") @db.VarChar(100)
+  keywords        Json
+  responseMessage String?         @map("response_message") @db.Text
+  priority        Int             @default(0)
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime?       @map("created_at")
+  updatedAt       DateTime?       @map("updated_at")
+  restaurant      Restaurant      @relation(fields: [restaurantId], references: [id])
+  aiResponseLogs  AiResponseLog[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, isActive, priority])
+  @@map("handover_rules")
 }
 
 model AuditLog {
