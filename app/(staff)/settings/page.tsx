@@ -41,6 +41,7 @@ export default async function SettingsPage() {
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             <SettingsLink href="/settings/restaurant" label="Restaurant details" />
             <SettingsLink href="/settings/staff-users" label="Staff users" />
+            <SettingsLink href="/knowledge-base" label="AI knowledge base" />
           </div>
         </section>
 

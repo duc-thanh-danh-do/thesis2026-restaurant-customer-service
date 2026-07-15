@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, ClipboardList, LayoutDashboard, Menu, QrCode, Settings, Users } from "lucide-react";
+import { BookOpen, Bot, ClipboardList, LayoutDashboard, Menu, QrCode, Settings, Users } from "lucide-react";
 import { canManageMenu, canManageRestaurant } from "@/lib/auth";
 
 type StaffSidebarUser = {
@@ -16,6 +16,7 @@ const operationalLinks = [
 
 const adminLinks = [
   { href: "/menu/admin", label: "Menu", icon: Menu },
+  { href: "/knowledge-base", label: "Knowledge", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -23,7 +24,7 @@ export default function StaffSidebar({ staffUser }: { staffUser: StaffSidebarUse
   const links = [
     ...operationalLinks,
     ...(canManageMenu(staffUser) ? [adminLinks[0]] : []),
-    ...(canManageRestaurant(staffUser) ? [adminLinks[1]] : []),
+    ...(canManageRestaurant(staffUser) ? adminLinks.slice(1) : []),
   ];
 
   return (

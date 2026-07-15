@@ -49,6 +49,7 @@ async function cleanupRestaurantByName(name: string) {
   await prisma.customerRequest.deleteMany({ where: { sessionId: { in: sessionIds } } });
   await prisma.chatMessage.deleteMany({ where: { sessionId: { in: sessionIds } } });
   await prisma.customerSession.deleteMany({ where: { id: { in: sessionIds } } });
+  await prisma.diningSession.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
   await prisma.menuItem.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
   await prisma.restaurantKnowledgeBase.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
   await prisma.staffUser.deleteMany({ where: { restaurantId: { in: restaurantIds } } });

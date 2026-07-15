@@ -1,12 +1,12 @@
 "use server";
 
+import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 async function getRestaurantId() {
-  const restaurant = await prisma.restaurant.findFirst();
-  if (!restaurant) throw new Error("No restaurant configured");
-  return restaurant.id;
+  const staffUser = await requireAdminUser();
+  return staffUser.restaurantId;
 }
 
 export type KnowledgeBaseEntry = {
@@ -16,6 +16,7 @@ export type KnowledgeBaseEntry = {
   category: string | null;
   isActive: boolean;
   createdAt: Date | null;
+  updatedAt: Date | null;
 };
 
 export async function getKnowledgeBaseEntriesAction(): Promise<KnowledgeBaseEntry[]> {
@@ -58,9 +59,13 @@ export async function createKnowledgeBaseEntryAction(data: {
         title: data.title,
         content: data.content,
         category: data.category || null,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
     });
     revalidatePath("/knowledge-base");
+    revalidatePath("/settings");
     return { success: true, data: entry };
   } catch (error) {
     console.error("Failed to create knowledge base entry:", error);
@@ -84,11 +89,13 @@ export async function updateKnowledgeBaseEntryAction(
       data: {
         title: data.title,
         content: data.content,
-        category: data.category ?? undefined,
+        category: data.category || null,
         isActive: data.isActive ?? undefined,
+        updatedAt: new Date(),
       },
     });
     revalidatePath("/knowledge-base");
+    revalidatePath("/settings");
     return { success: true };
   } catch (error) {
     console.error("Failed to update knowledge base entry:", error);
@@ -103,6 +110,7 @@ export async function deleteKnowledgeBaseEntryAction(id: number) {
       where: { id, restaurantId: rId },
     });
     revalidatePath("/knowledge-base");
+    revalidatePath("/settings");
     return { success: true };
   } catch (error) {
     console.error("Failed to delete knowledge base entry:", error);
