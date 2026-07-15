@@ -12,6 +12,7 @@ import {
 import type { KnowledgeBaseEntry } from "@/actions/knowledge-base.action";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import Toast, { useToast } from "@/components/ui/Toast";
+import KnowledgeDocumentPanel from "@/components/knowledge-base/KnowledgeDocumentPanel";
 
 const CATEGORIES = [
   "allergy",
@@ -78,6 +79,8 @@ export default function KnowledgeBaseTable() {
           </Button>
         </Link>
       </div>
+
+      <KnowledgeDocumentPanel />
 
       {/* Category filter */}
       <div className="flex gap-2 flex-wrap">
