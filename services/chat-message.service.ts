@@ -14,6 +14,12 @@ import { findRestaurantContext } from "@/repositories/restaurant.repository";
 import { generateAiText } from "@/services/ai-assistant.service";
 import { createCustomerSession } from "@/services/customer-session.service";
 import {
+  buildHandoverReply,
+  createStaffHandover,
+  evaluateHandover,
+  updateAiLogHandoverReason,
+} from "@/services/handover.service";
+import {
   createUnconfirmedOrder,
   serializeOrderDraft,
 } from "@/services/customer-order.service";
@@ -71,8 +77,19 @@ export async function sendCustomerChatMessage({
       message,
       prompt,
     });
-    const handoverRequired = requiresStaffHandover(message);
-    const orderToolResult = qrToken
+    const handoverDecision = await evaluateHandover({
+      restaurantId: session.restaurantId,
+      message,
+      assistantReply: reply,
+    });
+    const handoverResult = handoverDecision.required
+      ? await createStaffHandover({
+          sessionId: session.id,
+          customerMessage: message,
+          decision: handoverDecision,
+        })
+      : null;
+    const orderToolResult = !handoverDecision.required && qrToken
       ? await maybeCreateOrderDraft({
           qrToken,
           sessionId: session.id,
@@ -83,13 +100,15 @@ export async function sendCustomerChatMessage({
       : null;
     const finalReply = orderToolResult
       ? buildOrderDraftReply(orderToolResult)
-      : shouldHandleAsOrderRequest(message)
-        ? buildUnresolvedOrderReply()
-        : reply;
+      : handoverDecision.required
+        ? buildHandoverReply(reply, handoverDecision)
+        : shouldHandleAsOrderRequest(message)
+          ? buildUnresolvedOrderReply()
+          : reply;
 
     const aiMessage = await createChatMessage(session.id, "ai", finalReply);
 
-    await prisma.aiResponseLog.create({
+    const aiLog = await prisma.aiResponseLog.create({
       data: {
         sessionId: session.id,
         customerMessageId: customerMessage.id,
@@ -98,17 +117,21 @@ export async function sendCustomerChatMessage({
         retrievedContext: groundedContext,
         prompt,
         response: finalReply,
-        handoverRequired,
+        handoverRequired: handoverDecision.required,
         createdAt: new Date(),
       },
+    });
+    await updateAiLogHandoverReason({
+      logId: aiLog.id,
+      decision: handoverDecision,
     });
 
     return {
       reply: finalReply,
-      handoverRequired,
-      requestId: null,
+      handoverRequired: handoverDecision.required,
+      requestId: handoverResult?.requestId ?? null,
       sessionToken: session.sessionToken,
-      sessionStatus: session.status,
+      sessionStatus: handoverDecision.required ? "waiting_staff" : session.status,
       aiMessage,
       orderDraft: orderToolResult?.orderDraft ?? null,
     };
@@ -123,11 +146,16 @@ export async function sendCustomerChatMessage({
       customerMessage: message,
     });
     const reply = normalizeReply(await generateAiText(prompt));
-    const handoverRequired = requiresStaffHandover(message);
+    const handoverDecision = await evaluateHandover({
+      message,
+      assistantReply: reply,
+    });
 
     return {
-      reply,
-      handoverRequired,
+      reply: handoverDecision.required
+        ? buildHandoverReply(reply, handoverDecision)
+        : reply,
+      handoverRequired: handoverDecision.required,
       requestId: null,
       sessionToken: sessionToken ?? null,
       sessionStatus: "active",
@@ -592,10 +620,4 @@ function buildOrderDraftReply({
 
 function buildUnresolvedOrderReply() {
   return "I could not add that to your order draft yet. Please include the exact dish name from the menu, and I will prepare it for you to review.";
-}
-
-function requiresStaffHandover(message: string) {
-  return /\b(allerg\w*|bill|pay|payment|complaint|manager|staff|help)\b/i.test(
-    message,
-  );
 }

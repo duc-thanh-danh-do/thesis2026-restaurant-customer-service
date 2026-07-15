@@ -13,6 +13,7 @@ import {
   GET as getCustomerOrdersRoute,
   POST as createCustomerOrderRoute,
 } from "@/app/api/customer-orders/route";
+import { POST as sendCustomerChatMessageRoute } from "@/app/api/chat/messages/route";
 
 async function canReachDatabase() {
   try {
@@ -52,6 +53,9 @@ async function cleanupRestaurantByName(name: string) {
   await prisma.diningSession.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
   await prisma.menuItem.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
   await prisma.restaurantKnowledgeBase.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "handover_rules" WHERE "restaurant_id" IN (${restaurantIds.join(",")})`,
+  ).catch(() => undefined);
   await prisma.staffUser.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
   await prisma.restaurantTable.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
   await prisma.restaurant.deleteMany({ where: { id: { in: restaurantIds } } });
@@ -172,6 +176,48 @@ test("customer table flow persists session, messages, requests, orders, and clos
   assert.equal(requestBody.request.sessionId, createdSession.id);
   assert.equal(requestBody.request.status, "pending");
 
+  const previousGeminiApiKey = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = "";
+  let handoverResponse: Response | null = null;
+  try {
+    handoverResponse = await sendCustomerChatMessageRoute(
+      new Request("http://localhost/api/chat/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          qrToken: qrCodeToken,
+          sessionToken,
+          message: "I have a peanut allergy. Is this pizza safe for me?",
+        }),
+      }),
+    );
+  } finally {
+    if (previousGeminiApiKey === undefined) {
+      delete process.env.GEMINI_API_KEY;
+    } else {
+      process.env.GEMINI_API_KEY = previousGeminiApiKey;
+    }
+  }
+  assert.ok(handoverResponse);
+  const handoverBody = await handoverResponse.json();
+
+  assert.equal(handoverResponse.status, 200);
+  assert.equal(handoverBody.handoverRequired, true);
+  assert.equal(handoverBody.sessionStatus, "waiting_staff");
+  assert.ok(handoverBody.requestId);
+  assert.match(handoverBody.reply, /staff/i);
+
+  const handoverRequest = await prisma.customerRequest.findUnique({
+    where: { id: handoverBody.requestId },
+  });
+  assert.equal(handoverRequest?.requestType, "allergy_confirmation");
+  assert.equal(handoverRequest?.status, "pending");
+
+  const waitingSession = await prisma.customerSession.findUnique({
+    where: { sessionToken },
+  });
+  assert.equal(waitingSession?.status, "waiting_staff");
+
   const orderResponse = await createCustomerOrderRoute(
     new Request("http://localhost/api/customer-orders", {
       method: "POST",
@@ -209,8 +255,8 @@ test("customer table flow persists session, messages, requests, orders, and clos
   const getSessionBody = await getSessionResponse.json();
 
   assert.equal(getSessionResponse.status, 200);
-  assert.equal(getSessionBody.session.customerRequests.length, 1);
-  assert.equal(getSessionBody.session.chatMessages.length, 2);
+  assert.equal(getSessionBody.session.customerRequests.length, 2);
+  assert.equal(getSessionBody.session.chatMessages.length, 4);
 
   const closeSessionResponse = await closeCustomerSessionRoute(
     new Request(`http://localhost/api/customer-sessions/${sessionToken}`, {
