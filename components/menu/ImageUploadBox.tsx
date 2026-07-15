@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 
 interface ImageUploadBoxProps {
   value?: string | null;
@@ -70,10 +71,12 @@ export default function ImageUploadBox({
               Uploading...
             </span>
           ) : value ? (
-            <img
+            <Image
               src={value}
-              alt="Preview"
-              className="w-full h-full object-cover group-hover:opacity-60 transition-opacity"
+              alt="Uploaded menu item preview"
+              fill
+              sizes="64px"
+              className="object-cover group-hover:opacity-60 transition-opacity"
             />
           ) : (
             <svg

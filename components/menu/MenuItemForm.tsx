@@ -1,4 +1,5 @@
 import { Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -34,12 +35,14 @@ export default function MenuItemForm({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+          <div className="relative w-10 h-10 overflow-hidden bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
             {item.imageUrl ? (
-              <img
+              <Image
                 src={item.imageUrl}
                 alt={item.name}
-                className="w-full h-full object-cover"
+                fill
+                sizes="40px"
+                className="object-cover"
               />
             ) : (
               <div className="w-6 h-6 bg-gray-300 rounded"></div>

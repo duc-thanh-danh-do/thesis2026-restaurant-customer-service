@@ -1,7 +1,6 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { sendCustomerChatMessage } from "@/services/chat-message.service";
 
 export async function getTableMessagesAction(tableId: string | number) {
     try {
