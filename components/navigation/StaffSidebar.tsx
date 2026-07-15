@@ -1,17 +1,31 @@
 import Link from "next/link";
 import { Bot, ClipboardList, LayoutDashboard, Menu, QrCode, Settings, Users } from "lucide-react";
+import { canManageMenu, canManageRestaurant } from "@/lib/auth";
 
-const links = [
+type StaffSidebarUser = {
+  role: string | null;
+};
+
+const operationalLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/sessions", label: "Sessions", icon: Users },
   { href: "/requests", label: "Requests", icon: ClipboardList },
   { href: "/tables", label: "Tables", icon: QrCode },
-  { href: "/menu", label: "Menu", icon: Menu },
   { href: "/ai-logs", label: "AI logs", icon: Bot },
+];
+
+const adminLinks = [
+  { href: "/menu/admin", label: "Menu", icon: Menu },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export default function StaffSidebar() {
+export default function StaffSidebar({ staffUser }: { staffUser: StaffSidebarUser }) {
+  const links = [
+    ...operationalLinks,
+    ...(canManageMenu(staffUser) ? [adminLinks[0]] : []),
+    ...(canManageRestaurant(staffUser) ? [adminLinks[1]] : []),
+  ];
+
   return (
     <aside className="hidden w-48 shrink-0 border-r border-slate-200 bg-[#0f2147] p-5 text-white lg:block">
       <div className="mb-8">

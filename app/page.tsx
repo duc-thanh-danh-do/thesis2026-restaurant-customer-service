@@ -77,9 +77,9 @@ export default async function Home() {
             </div>
           </div>
 
-          {/* Staff & manager section */}
+          {/* Staff and admin section */}
           <div>
-            <h2 className="text-sm font-medium text-foreground mb-4">Staff & manager views</h2>
+            <h2 className="text-sm font-medium text-foreground mb-4">Staff and admin views</h2>
 
             <div className="space-y-3">
               <Link href="/dashboard">
