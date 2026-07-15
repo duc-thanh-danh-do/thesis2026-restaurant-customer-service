@@ -19,6 +19,7 @@ model Restaurant {
   staffUsers    StaffUser[]
   menuItems     MenuItem[]
   knowledgeBase RestaurantKnowledgeBase[]
+  knowledgeDocuments KnowledgeDocument[]
   handoverRules HandoverRule[]
 
   ingredientCatalogs IngredientCatalog[]
@@ -85,6 +86,7 @@ model StaffUser {
   isActive     Boolean    @default(true) @map("is_active")
   createdAt    DateTime?  @map("created_at")
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  uploadedKnowledgeDocuments KnowledgeDocument[]
 
   @@map("staff_users")
 }
@@ -165,6 +167,39 @@ model RestaurantKnowledgeBase {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
 
   @@map("restaurant_knowledge_base")
+}
+
+model KnowledgeDocument {
+  id               Int                      @id @default(autoincrement())
+  restaurantId     Int                      @map("restaurant_id")
+  uploadedByStaffId Int?                    @map("uploaded_by_staff_id")
+  originalFilename String                   @map("original_filename") @db.VarChar(255)
+  mimeType         String                   @map("mime_type") @db.VarChar(255)
+  fileSize         Int                      @map("file_size")
+  status           String                   @db.VarChar(50)
+  errorMessage     String?                  @map("error_message") @db.Text
+  createdAt        DateTime?                @map("created_at")
+  updatedAt        DateTime?                @map("updated_at")
+  restaurant       Restaurant               @relation(fields: [restaurantId], references: [id])
+  uploadedBy       StaffUser?               @relation(fields: [uploadedByStaffId], references: [id])
+  chunks           KnowledgeDocumentChunk[]
+
+  @@index([restaurantId, status])
+  @@index([uploadedByStaffId])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeDocumentChunk {
+  id         Int               @id @default(autoincrement())
+  documentId Int               @map("document_id")
+  chunkIndex Int               @map("chunk_index")
+  content    String            @db.Text
+  createdAt  DateTime?         @map("created_at")
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@map("knowledge_document_chunks")
 }
 
 model AiResponseLog {
