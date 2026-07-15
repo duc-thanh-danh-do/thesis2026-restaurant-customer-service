@@ -439,7 +439,7 @@ export async function getStaffSettingsData(): Promise<StaffSettingsData> {
           id: 1,
           name: "Shift Lead",
           email: "staff@testpizza.local",
-          role: "manager",
+          role: "admin",
           isActive: true,
         },
       ],

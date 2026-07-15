@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canManageMenu,
+  canManageRestaurant,
   createStaffSessionCookieValue,
   verifyStaffSessionCookieValue,
 } from "@/lib/auth";
@@ -59,6 +61,16 @@ test("rejects malformed staff session cookies", () => {
   assert.equal(verifyStaffSessionCookieValue(undefined), null);
   assert.equal(verifyStaffSessionCookieValue("not-a-session"), null);
   assert.equal(verifyStaffSessionCookieValue("1.not-hex"), null);
+});
+
+test("allows only admin users to manage restaurant and menu settings", () => {
+  assert.equal(canManageRestaurant({ role: "admin" }), true);
+  assert.equal(canManageMenu({ role: "admin" }), true);
+
+  assert.equal(canManageRestaurant({ role: "staff" }), false);
+  assert.equal(canManageMenu({ role: "staff" }), false);
+  assert.equal(canManageRestaurant({ role: "manager" }), false);
+  assert.equal(canManageMenu({ role: "owner" }), false);
 });
 
 test("requires a staff session secret in production", () => {

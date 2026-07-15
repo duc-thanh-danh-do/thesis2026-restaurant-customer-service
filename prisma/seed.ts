@@ -113,7 +113,7 @@ async function main() {
       restaurantId: restaurant.id,
       name: "Shift Lead",
       passwordHash: staffPasswordHash,
-      role: "manager",
+      role: "admin",
       isActive: true,
     },
     create: {
@@ -121,7 +121,7 @@ async function main() {
       name: "Shift Lead",
       email: "staff@testpizza.local",
       passwordHash: staffPasswordHash,
-      role: "manager",
+      role: "admin",
       isActive: true,
       createdAt: new Date(),
     },

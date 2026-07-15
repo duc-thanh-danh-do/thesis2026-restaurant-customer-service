@@ -1,8 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { STAFF_ROLES, type StaffRole } from "@/constants/roles";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
+
+type StaffUserWithRole = {
+  role: string | null;
+};
 
 export function getStaffSessionCookieName() {
   return process.env.STAFF_SESSION_COOKIE ?? "staff_session";
@@ -76,6 +81,28 @@ export async function requireStaffUser() {
 
   if (!staffUser) {
     redirect("/staff-signin");
+  }
+
+  return staffUser;
+}
+
+export function isStaffRole(role: string | null | undefined): role is StaffRole {
+  return STAFF_ROLES.includes(role as StaffRole);
+}
+
+export function canManageRestaurant(staffUser: StaffUserWithRole | null | undefined) {
+  return staffUser?.role === "admin";
+}
+
+export function canManageMenu(staffUser: StaffUserWithRole | null | undefined) {
+  return staffUser?.role === "admin";
+}
+
+export async function requireAdminUser() {
+  const staffUser = await requireStaffUser();
+
+  if (!canManageRestaurant(staffUser)) {
+    redirect("/dashboard");
   }
 
   return staffUser;
