@@ -13,8 +13,6 @@ type OrderItemRow = {
 };
 
 const CLOSED_ORDER_STATUSES = [
-  "Served",
-  "served",
   "Paid",
   "paid",
   "Cancelled",

@@ -1,4 +1,4 @@
-import ActiveSessionsTable from "@/components/staff/ActiveSessionsTable";
+import ActiveSessionsCards from "@/components/staff/ActiveSessionsCards";
 import { getStaffSessions } from "@/lib/staff-page-data";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export default async function StaffSessionsPage() {
           <Metric label="Requests" value={requests} />
         </div>
       </div>
-      <ActiveSessionsTable sessions={sessions} />
+      <ActiveSessionsCards sessions={sessions} />
     </main>
   );
 }

@@ -7,10 +7,21 @@ export function findTableByQrToken(qrCodeToken: string) {
   });
 }
 
+export function findActiveDiningSessionByTableId(tableId: number) {
+  return prisma.diningSession.findFirst({
+    where: {
+      tableId,
+      status: { in: ["active", "waiting_staff"] },
+    },
+    orderBy: { startedAt: "desc" },
+  });
+}
+
 export function findSessionByToken(sessionToken: string) {
   return prisma.customerSession.findUnique({
     where: { sessionToken },
     include: {
+      diningSession: true,
       restaurant: true,
       table: true,
       chatMessages: { orderBy: { id: "asc" } },

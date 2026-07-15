@@ -3,6 +3,9 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Bot, Droplet, Send, Shield } from "lucide-react";
+import OrderDraftCard, {
+  type CustomerOrderDraft,
+} from "@/components/customer/OrderDraftCard";
 import {
   CustomerBottomNav,
   CustomerMobileHeader,
@@ -28,6 +31,7 @@ type Message = {
   sender: "assistant" | "user";
   content: string;
   timestamp: Date;
+  orderDraft?: CustomerOrderDraft | null;
 };
 
 type SessionPayload = {
@@ -130,7 +134,22 @@ export default function CustomerTableChat({
 
   const sendMessage = async (content = message) => {
     const trimmedMessage = content.trim();
-    if (!trimmedMessage || !sessionToken || isAssistantTyping) return;
+    const tableQrToken = qrToken.trim();
+    if (!trimmedMessage || isAssistantTyping) return;
+
+    if (!tableQrToken) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: `assistant-error-${Date.now()}`,
+          sender: "assistant",
+          content:
+            "This table link is missing its QR token. Please scan the table QR code again.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
 
     const now = new Date();
     setMessages((current) => [
@@ -149,7 +168,11 @@ export default function CustomerTableChat({
       const response = await fetch("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionToken, message: trimmedMessage }),
+        body: JSON.stringify({
+          qrToken: tableQrToken,
+          sessionToken,
+          message: trimmedMessage,
+        }),
       });
 
       if (!response.ok) {
@@ -168,8 +191,15 @@ export default function CustomerTableChat({
 
       const payload = (await response.json()) as {
         reply: string;
+        sessionToken: string | null;
         aiMessage: { id: number; createdAt?: string | null };
+        orderDraft?: CustomerOrderDraft | null;
       };
+
+      if (payload.sessionToken) {
+        window.localStorage.setItem("dining-session-token", payload.sessionToken);
+        setSessionToken(payload.sessionToken);
+      }
 
       setMessages((current) => [
         ...current,
@@ -180,6 +210,7 @@ export default function CustomerTableChat({
           timestamp: payload.aiMessage.createdAt
             ? new Date(payload.aiMessage.createdAt)
             : new Date(),
+          orderDraft: payload.orderDraft ?? null,
         },
       ]);
     } catch {
@@ -196,6 +227,54 @@ export default function CustomerTableChat({
     } finally {
       setIsAssistantTyping(false);
     }
+  };
+
+  const confirmOrderDraft = async (orderId: number) => {
+    const response = await fetch(`/api/customer-orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "confirm" }),
+    });
+
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { order: CustomerOrderDraft };
+
+    setMessages((current) =>
+      current.map((currentMessage) =>
+        currentMessage.orderDraft?.id === orderId
+          ? { ...currentMessage, orderDraft: payload.order }
+          : currentMessage,
+      ),
+    );
+  };
+
+  const updateOrderDraftItemQuantity = async (
+    orderId: number,
+    itemId: number,
+    quantity: number,
+  ) => {
+    const response = await fetch(`/api/customer-orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update_item_quantity",
+        itemId,
+        quantity,
+      }),
+    });
+
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { order: CustomerOrderDraft };
+
+    setMessages((current) =>
+      current.map((currentMessage) =>
+        currentMessage.orderDraft?.id === orderId
+          ? { ...currentMessage, orderDraft: payload.order }
+          : currentMessage,
+      ),
+    );
   };
 
   return (
@@ -255,6 +334,15 @@ export default function CustomerTableChat({
                   }`}
                 >
                   <p className="text-sm">{msg.content}</p>
+                  {msg.sender === "assistant" && msg.orderDraft ? (
+                    <OrderDraftCard
+                      draft={msg.orderDraft}
+                      editHref={`${basePath}/order`}
+                      onConfirm={confirmOrderDraft}
+                      onUpdateItemQuantity={updateOrderDraftItemQuantity}
+                      className="mt-3"
+                    />
+                  ) : null}
                   <p
                     className={`mt-1 text-xs ${
                       msg.sender === "assistant"
@@ -304,7 +392,7 @@ export default function CustomerTableChat({
                 sendMessage("Which dishes are safe for my allergens?")
               }
               className="flex shrink-0 items-center gap-2 rounded-full border border-[#d5e1ec] bg-[#f5f9fc] px-3 py-2 text-sm"
-              disabled={!sessionToken || isAssistantTyping}
+              disabled={isAssistantTyping}
             >
               <Shield className="h-4 w-4 text-[#142653]" />
               Ask about allergens
@@ -312,7 +400,7 @@ export default function CustomerTableChat({
             <button
               onClick={() => sendMessage("Can I get water for the table?")}
               className="flex shrink-0 items-center gap-2 rounded-full border border-[#d5e1ec] bg-[#f5f9fc] px-3 py-2 text-sm"
-              disabled={!sessionToken || isAssistantTyping}
+              disabled={isAssistantTyping}
             >
               <Droplet className="h-4 w-4 text-[#142653]" />
               Ask for water
@@ -335,7 +423,7 @@ export default function CustomerTableChat({
             />
             <button
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#142653] disabled:bg-gray-300"
-              disabled={!message.trim() || !sessionToken || isAssistantTyping}
+              disabled={!message.trim() || isAssistantTyping}
             >
               <Send className="h-4 w-4 text-white" />
             </button>
@@ -347,7 +435,7 @@ export default function CustomerTableChat({
         activeTab="chat"
         basePath={basePath}
         cartCount={cartCount > 0 ? cartCount : undefined}
-        orderCount={1}
+        orderCount={undefined}
       />
     </CustomerMobileLayout>
   );

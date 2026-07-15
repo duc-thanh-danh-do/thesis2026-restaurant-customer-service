@@ -11,6 +11,9 @@ import {
   CustomerMobileHeader,
   CustomerMobileLayout,
 } from "@/components/layout/CustomerMobileLayout";
+import OrderDraftCard, {
+  type CustomerOrderDraft,
+} from "@/components/customer/OrderDraftCard";
 
 const cartStorageKey = "bistro-demo-cart";
 const orderSteps = ["Placed", "Preparing", "Ready", "Served"];
@@ -142,6 +145,54 @@ export default function OrderPage() {
     [orders],
   );
 
+  const confirmOrderDraft = async (orderId: number) => {
+    const response = await fetch(`/api/customer-orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "confirm" }),
+    });
+
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { order: CustomerOrderDraft };
+
+    setOrders((current) =>
+      current.map((order) =>
+        order.id === orderId
+          ? { ...order, ...payload.order, tableNumber: order.tableNumber }
+          : order,
+      ),
+    );
+  };
+
+  const updateOrderDraftItemQuantity = async (
+    orderId: number,
+    itemId: number,
+    quantity: number,
+  ) => {
+    const response = await fetch(`/api/customer-orders/${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update_item_quantity',
+        itemId,
+        quantity,
+      }),
+    });
+
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { order: CustomerOrderDraft };
+
+    setOrders((current) =>
+      current.map((order) =>
+        order.id === orderId
+          ? { ...order, ...payload.order, tableNumber: order.tableNumber }
+          : order,
+      ),
+    );
+  };
+
   return (
     <CustomerMobileLayout>
       <CustomerMobileHeader
@@ -160,86 +211,97 @@ export default function OrderPage() {
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-4">
         <div className="w-full">
           {orders.map((order) => (
-            <div
-              key={order.id}
-              className="mb-4 rounded-[20px] border border-[#d5e1ec] bg-white p-5"
-            >
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-[#142653]">
-                    ORDER #{order.id}
+            order.status === "unconfirmed" ? (
+              <OrderDraftCard
+                key={order.id}
+                draft={order}
+                editHref={`${basePath}/menu`}
+                onConfirm={confirmOrderDraft}
+                onUpdateItemQuantity={updateOrderDraftItemQuantity}
+                className="mb-4"
+              />
+            ) : (
+              <div
+                key={order.id}
+                className="mb-4 rounded-[20px] border border-[#d5e1ec] bg-white p-5"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-[#142653]">
+                      ORDER #{order.id}
+                    </span>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Placed{" "}
+                      {order.createdAt
+                        ? new Date(order.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "just now"}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-lg font-bold text-[#142653]">
+                    EUR {order.total.toFixed(2)}
                   </span>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    Placed{" "}
-                    {order.createdAt
-                      ? new Date(order.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "just now"}
-                  </p>
                 </div>
-                <span className="shrink-0 text-lg font-bold text-[#142653]">
-                  EUR {order.total.toFixed(2)}
-                </span>
-              </div>
 
-              <div className="mb-4">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  PROGRESS
-                </span>
-                <p className="mt-1 text-sm font-medium text-[#438ed8]">
-                  {formatOrderStatus(order.status)}
-                </p>
+                <div className="mb-4">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    PROGRESS
+                  </span>
+                  <p className="mt-1 text-sm font-medium text-[#438ed8]">
+                    {formatOrderStatus(order.status)}
+                  </p>
 
-                <div className="mt-3 flex items-center gap-2">
-                  {orderSteps.map((step, index) => {
-                    const activeIndex = orderStepIndex(order.status);
-                    const isComplete = index < activeIndex;
-                    const isActive = index === activeIndex;
+                  <div className="mt-3 flex items-center gap-2">
+                    {orderSteps.map((step, index) => {
+                      const activeIndex = orderStepIndex(order.status);
+                      const isComplete = index < activeIndex;
+                      const isActive = index === activeIndex;
 
-                    return (
-                      <div className="contents" key={step}>
-                        <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                            index <= activeIndex
-                              ? "bg-[#438ed8] text-white"
-                              : "border-2 border-[#d5e1ec] bg-white text-[#8aa0b6]"
-                          }`}
-                        >
-                          {isComplete ? (
-                            <Check className="h-4 w-4" />
-                          ) : isActive ? (
-                            <span className="h-3 w-3 rounded-full bg-current"></span>
+                      return (
+                        <div className="contents" key={step}>
+                          <div
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                              index <= activeIndex
+                                ? "bg-[#438ed8] text-white"
+                                : "border-2 border-[#d5e1ec] bg-white text-[#8aa0b6]"
+                            }`}
+                          >
+                            {isComplete ? (
+                              <Check className="h-4 w-4" />
+                            ) : isActive ? (
+                              <span className="h-3 w-3 rounded-full bg-current"></span>
+                            ) : null}
+                          </div>
+                          {index < orderSteps.length - 1 ? (
+                            <div
+                              className={`h-1 flex-1 ${index < activeIndex ? "bg-[#438ed8]" : "bg-[#d5e1ec]"}`}
+                            />
                           ) : null}
                         </div>
-                        {index < orderSteps.length - 1 ? (
-                          <div
-                            className={`h-1 flex-1 ${index < activeIndex ? "bg-[#438ed8]" : "bg-[#d5e1ec]"}`}
-                          />
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {order.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex justify-between gap-3 text-sm"
+                    >
+                      <span className="min-w-0 text-[#142653]">
+                        {item.quantity}x {item.name}
+                      </span>
+                      <span className="shrink-0 text-[#142653]">
+                        EUR {(item.price * item.quantity).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between gap-3 text-sm"
-                  >
-                    <span className="min-w-0 text-[#142653]">
-                      {item.quantity}x {item.name}
-                    </span>
-                    <span className="shrink-0 text-[#142653]">
-                      EUR {(item.price * item.quantity).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )
           ))}
 
           <div className="flex items-center justify-between rounded-[20px] bg-white p-4">
@@ -264,7 +326,7 @@ export default function OrderPage() {
         activeTab="order"
         basePath={basePath}
         cartCount={cartCount > 0 ? cartCount : undefined}
-        orderCount={1}
+        orderCount={orders.length > 0 ? orders.length : undefined}
       />
     </CustomerMobileLayout>
   );

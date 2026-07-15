@@ -14,6 +14,7 @@ model Restaurant {
   createdAt     DateTime?                 @map("created_at")
   updatedAt     DateTime?                 @map("updated_at")
   tables        RestaurantTable[]
+  diningSessions DiningSession[]
   sessions      CustomerSession[]
   staffUsers    StaffUser[]
   menuItems     MenuItem[]
@@ -33,19 +34,36 @@ model RestaurantTable {
   isActive     Boolean           @default(true) @map("is_active")
   createdAt    DateTime?         @map("created_at")
   restaurant   Restaurant        @relation(fields: [restaurantId], references: [id])
+  diningSessions DiningSession[]
   sessions     CustomerSession[]
 
   @@map("restaurant_tables")
 }
 
+model DiningSession {
+  id               Int                @id @default(autoincrement())
+  restaurantId     Int                @map("restaurant_id")
+  tableId          Int                @map("table_id")
+  status           String             @db.VarChar(50)
+  startedAt        DateTime?          @map("started_at")
+  endedAt          DateTime?          @map("ended_at")
+  restaurant       Restaurant         @relation(fields: [restaurantId], references: [id])
+  table            RestaurantTable    @relation(fields: [tableId], references: [id])
+  customerSessions CustomerSession[]
+
+  @@map("dining_sessions")
+}
+
 model CustomerSession {
   id               Int                @id @default(autoincrement())
+  diningSessionId  Int                @map("dining_session_id")
   restaurantId     Int                @map("restaurant_id")
   tableId          Int                @map("table_id")
   sessionToken     String             @unique @map("session_token") @db.VarChar(255)
   status           String             @db.VarChar(50)
   startedAt        DateTime?          @map("started_at")
   endedAt          DateTime?          @map("ended_at")
+  diningSession    DiningSession      @relation(fields: [diningSessionId], references: [id])
   restaurant       Restaurant         @relation(fields: [restaurantId], references: [id])
   table            RestaurantTable    @relation(fields: [tableId], references: [id])
   chatMessages     ChatMessage[]

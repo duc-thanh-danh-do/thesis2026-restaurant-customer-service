@@ -16,7 +16,7 @@ export default function MenuAdminHeader() {
         {/* Tabs */}
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
-            Menu managment
+            Menu management
           </h2>
 
           <div className="flex items-center gap-2 mt-4">

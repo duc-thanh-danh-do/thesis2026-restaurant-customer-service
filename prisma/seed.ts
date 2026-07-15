@@ -355,10 +355,29 @@ async function main() {
   });
 
   if (table2) {
+    const diningSession =
+      (await prisma.diningSession.findFirst({
+        where: {
+          tableId: table2.id,
+          status: "active",
+        },
+      })) ??
+      (await prisma.diningSession.create({
+        data: {
+          restaurantId: restaurant.id,
+          tableId: table2.id,
+          status: "active",
+          startedAt: new Date(),
+        },
+      }));
+
     const session = await prisma.customerSession.upsert({
       where: { sessionToken: "test-session-table-2" },
-      update: {},
+      update: {
+        diningSessionId: diningSession.id,
+      },
       create: {
+        diningSessionId: diningSession.id,
         restaurantId: restaurant.id,
         tableId: table2.id,
         sessionToken: "test-session-table-2",
@@ -391,11 +410,11 @@ async function main() {
   const existingSession = await prisma.customerSession.findFirst();
 
   if (existingSession) {
-    // Create a real order with initial status "Preparing"
+    // Create a real staff-visible order with initial status "preparing"
     const newOrder = await prisma.order.create({
       data: {
         sessionId: existingSession.id,
-        status: "Preparing",
+        status: "preparing",
         total: 26.5,
 
         orderItems: {
