@@ -25,6 +25,24 @@ export type RetrievedKnowledge = {
   documentChunks: RetrievedDocumentChunk[];
 };
 
+export type RetrievedKnowledgeLog = {
+  manualEntries: Array<{
+    id: number;
+    title: string;
+    category: string | null;
+    content: string;
+    score: number;
+  }>;
+  documentChunks: Array<{
+    id: number;
+    documentId: number;
+    documentTitle: string;
+    chunkIndex: number;
+    content: string;
+    score: number;
+  }>;
+};
+
 type KnowledgeEntryRow = RetrievedKnowledgeEntry;
 type DocumentChunkRow = RetrievedDocumentChunk;
 
@@ -136,6 +154,28 @@ export function formatRetrievedKnowledge(knowledge: RetrievedKnowledge) {
   }
 
   return sections.join("\n\n");
+}
+
+export function buildRetrievedKnowledgeLog(
+  knowledge: RetrievedKnowledge,
+): RetrievedKnowledgeLog {
+  return {
+    manualEntries: knowledge.entries.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      category: entry.category,
+      content: entry.content,
+      score: entry.score,
+    })),
+    documentChunks: knowledge.documentChunks.map((chunk) => ({
+      id: chunk.id,
+      documentId: chunk.documentId,
+      documentTitle: chunk.documentTitle,
+      chunkIndex: chunk.chunkIndex,
+      content: chunk.content,
+      score: chunk.score,
+    })),
+  };
 }
 
 async function retrieveKnowledgeEntries({

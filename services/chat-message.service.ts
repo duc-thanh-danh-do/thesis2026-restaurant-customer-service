@@ -25,6 +25,7 @@ import {
   serializeOrderDraft,
 } from "@/services/customer-order.service";
 import {
+  buildRetrievedKnowledgeLog,
   formatRetrievedKnowledge,
   retrieveRelevantKnowledge,
 } from "@/services/knowledge-retrieval.service";
@@ -73,6 +74,7 @@ export async function sendCustomerChatMessage({
       restaurantId: session.restaurantId,
       query: message,
     });
+    const retrievedKnowledgeLog = buildRetrievedKnowledgeLog(retrievedKnowledge);
     const groundedContext = buildGroundedContextForAi(
       restaurant,
       formatRetrievedKnowledge(retrievedKnowledge),
@@ -133,6 +135,7 @@ export async function sendCustomerChatMessage({
         createdAt: new Date(),
       },
     });
+    await storeRetrievedKnowledgeLog(aiLog.id, retrievedKnowledgeLog);
     await updateAiLogHandoverReason({
       logId: aiLog.id,
       decision: handoverDecision,
@@ -182,6 +185,34 @@ export async function sendCustomerChatMessage({
       fallback: true,
     };
   }
+}
+
+async function storeRetrievedKnowledgeLog(
+  logId: number,
+  retrievedKnowledgeLog: ReturnType<typeof buildRetrievedKnowledgeLog>,
+) {
+  try {
+    await prisma.$executeRaw`
+      UPDATE "ai_response_logs"
+      SET "retrieved_knowledge" = ${JSON.stringify(retrievedKnowledgeLog)}::jsonb
+      WHERE "id" = ${logId}
+    `;
+  } catch (error) {
+    if (
+      !isDatabaseUnavailable(error) &&
+      !isMissingRetrievedKnowledgeColumn(error)
+    ) {
+      logger.error("Failed to store retrieved AI knowledge details", error);
+    }
+  }
+}
+
+function isMissingRetrievedKnowledgeColumn(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("retrieved_knowledge") &&
+    error.message.includes("does not exist")
+  );
 }
 
 async function resolveActiveChatSession({

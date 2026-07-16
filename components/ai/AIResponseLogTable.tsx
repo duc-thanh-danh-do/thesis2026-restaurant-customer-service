@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Bot, ShieldAlert } from "lucide-react";
+import { ArrowRight, Bot, FileText, ShieldAlert } from "lucide-react";
 import type { StaffAiLogSummary } from "@/lib/staff-page-data";
 
 function shortText(value: string) {
@@ -31,17 +31,18 @@ export default function AIResponseLogTable({ logs }: { logs: StaffAiLogSummary[]
 
   return (
     <section className="surface overflow-hidden">
-      <div className="grid grid-cols-[0.6fr_0.7fr_1.4fr_1.4fr_0.7fr] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500 max-xl:hidden">
+      <div className="grid grid-cols-[0.6fr_0.7fr_1.3fr_1.2fr_0.8fr_0.7fr] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500 max-xl:hidden">
         <span>Table</span>
         <span>Model</span>
         <span>Prompt</span>
         <span>Response</span>
+        <span>Evidence</span>
         <span>Created</span>
       </div>
       <div className="divide-y divide-slate-100">
         {logs.map((log) => (
           <Link
-            className="grid gap-3 px-4 py-4 transition hover:bg-slate-50 xl:grid-cols-[0.6fr_0.7fr_1.4fr_1.4fr_0.7fr] xl:items-start"
+            className="grid gap-3 px-4 py-4 transition hover:bg-slate-50 xl:grid-cols-[0.6fr_0.7fr_1.3fr_1.2fr_0.8fr_0.7fr] xl:items-start"
             href={`/ai-logs/${log.id}`}
             key={log.id}
           >
@@ -49,6 +50,16 @@ export default function AIResponseLogTable({ logs }: { logs: StaffAiLogSummary[]
             <div className="text-sm text-slate-600">{log.modelName}</div>
             <div className="text-sm leading-6 text-slate-700">{shortText(log.prompt)}</div>
             <div className="text-sm leading-6 text-slate-700">{shortText(log.response)}</div>
+            <div className="flex flex-wrap gap-1.5">
+              <EvidenceBadge label="KB" value={log.retrievedManualCount} />
+              <EvidenceBadge label="Docs" value={log.retrievedDocumentChunkCount} />
+              {log.handoverRuleName ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  <ShieldAlert className="size-3" aria-hidden="true" />
+                  Rule
+                </span>
+              ) : null}
+            </div>
             <div className="flex items-center justify-between gap-3 text-sm text-slate-500">
               <span>{dateLabel(log.createdAt)}</span>
               {log.handoverRequired ? (
@@ -61,5 +72,14 @@ export default function AIResponseLogTable({ logs }: { logs: StaffAiLogSummary[]
         ))}
       </div>
     </section>
+  );
+}
+
+function EvidenceBadge({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+      <FileText className="size-3" aria-hidden="true" />
+      {label} {value}
+    </span>
   );
 }

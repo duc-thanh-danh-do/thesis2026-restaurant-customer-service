@@ -210,6 +210,7 @@ model AiResponseLog {
   aiMessageId       Int?             @map("ai_message_id")
   modelName         String?          @map("model_name") @db.VarChar(100)
   retrievedContext  String?          @map("retrieved_context") @db.Text
+  retrievedKnowledge Json?           @map("retrieved_knowledge")
   prompt            String?          @db.Text
   response          String?          @db.Text
   handoverRequired  Boolean          @default(false) @map("handover_required")

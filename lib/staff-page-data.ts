@@ -67,7 +67,40 @@ export type StaffAiLogSummary = {
   prompt: string;
   response: string;
   handoverRequired: boolean;
+  handoverReason: string | null;
+  handoverRuleName: string | null;
+  retrievedManualCount: number;
+  retrievedDocumentChunkCount: number;
   createdAt: Date | null;
+};
+
+export type StaffAiRetrievedKnowledge = {
+  manualEntries: Array<{
+    id: number;
+    title: string;
+    category: string | null;
+    content: string;
+    score: number;
+  }>;
+  documentChunks: Array<{
+    id: number;
+    documentId: number;
+    documentTitle: string;
+    chunkIndex: number;
+    content: string;
+    score: number;
+  }>;
+};
+
+export type StaffAiLogDetail = StaffAiLogSummary & {
+  sessionId: number | null;
+  sessionStatus: string | null;
+  customerMessage: string;
+  aiMessage: string;
+  retrievedContext: string;
+  retrievedKnowledge: StaffAiRetrievedKnowledge;
+  handoverRuleCategory: string | null;
+  handoverRequestType: string | null;
 };
 
 export type StaffSettingsData = {
@@ -110,6 +143,72 @@ function toNumber(value: unknown) {
     return (value as { toNumber: () => number }).toNumber();
   }
   return Number(value ?? 0);
+}
+
+type StaffAiLogRow = {
+  id: number;
+  tableNumber: string | null;
+  modelName: string | null;
+  prompt: string | null;
+  response: string | null;
+  retrievedContext: string | null;
+  retrievedKnowledge: unknown;
+  handoverRequired: boolean;
+  handoverReason: string | null;
+  handoverRuleName: string | null;
+  handoverRuleCategory: string | null;
+  handoverRequestType: string | null;
+  sessionId: number | null;
+  sessionStatus: string | null;
+  customerMessage: string | null;
+  aiMessage: string | null;
+  createdAt: Date | null;
+};
+
+function emptyRetrievedKnowledge(): StaffAiRetrievedKnowledge {
+  return {
+    manualEntries: [],
+    documentChunks: [],
+  };
+}
+
+function parseRetrievedKnowledge(value: unknown): StaffAiRetrievedKnowledge {
+  if (!value) return emptyRetrievedKnowledge();
+
+  const parsed = typeof value === "string" ? safeJsonParse(value) : value;
+  if (!parsed || typeof parsed !== "object") return emptyRetrievedKnowledge();
+
+  const candidate = parsed as Partial<StaffAiRetrievedKnowledge>;
+
+  return {
+    manualEntries: Array.isArray(candidate.manualEntries)
+      ? candidate.manualEntries.map((entry) => ({
+          id: Number(entry.id),
+          title: String(entry.title ?? "Untitled entry"),
+          category: entry.category ? String(entry.category) : null,
+          content: String(entry.content ?? ""),
+          score: Number(entry.score ?? 0),
+        }))
+      : [],
+    documentChunks: Array.isArray(candidate.documentChunks)
+      ? candidate.documentChunks.map((chunk) => ({
+          id: Number(chunk.id),
+          documentId: Number(chunk.documentId),
+          documentTitle: String(chunk.documentTitle ?? "Untitled document"),
+          chunkIndex: Number(chunk.chunkIndex ?? 0),
+          content: String(chunk.content ?? ""),
+          score: Number(chunk.score ?? 0),
+        }))
+      : [],
+  };
+}
+
+function safeJsonParse(value: string) {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function fallbackSessions(): StaffSessionDetail[] {
@@ -351,23 +450,41 @@ export async function getStaffTableDetail(tableId: number) {
 
 export async function getStaffAiLogs() {
   try {
-    const logs = await prisma.aiResponseLog.findMany({
-      include: {
-        session: { include: { table: true } },
-      },
-      orderBy: { id: "desc" },
-      take: 40,
-    });
+    const logs = await prisma.$queryRaw<StaffAiLogRow[]>`
+      SELECT
+        logs."id",
+        tables."table_number" AS "tableNumber",
+        logs."model_name" AS "modelName",
+        logs."prompt",
+        logs."response",
+        logs."retrieved_context" AS "retrievedContext",
+        logs."retrieved_knowledge" AS "retrievedKnowledge",
+        logs."handover_required" AS "handoverRequired",
+        logs."handover_reason" AS "handoverReason",
+        rules."name" AS "handoverRuleName",
+        rules."category" AS "handoverRuleCategory",
+        rules."request_type" AS "handoverRequestType",
+        sessions."id" AS "sessionId",
+        sessions."status" AS "sessionStatus",
+        customer_messages."message_content" AS "customerMessage",
+        ai_messages."message_content" AS "aiMessage",
+        logs."created_at" AS "createdAt"
+      FROM "ai_response_logs" logs
+      LEFT JOIN "customer_sessions" sessions
+        ON sessions."id" = logs."session_id"
+      LEFT JOIN "restaurant_tables" tables
+        ON tables."id" = sessions."table_id"
+      LEFT JOIN "chat_messages" customer_messages
+        ON customer_messages."id" = logs."customer_message_id"
+      LEFT JOIN "chat_messages" ai_messages
+        ON ai_messages."id" = logs."ai_message_id"
+      LEFT JOIN "handover_rules" rules
+        ON rules."id" = logs."handover_rule_id"
+      ORDER BY logs."id" DESC
+      LIMIT 40
+    `;
 
-    return logs.map((log): StaffAiLogSummary => ({
-      id: log.id,
-      tableNumber: log.session?.table.tableNumber ?? "Unassigned",
-      modelName: log.modelName ?? "Unknown model",
-      prompt: log.prompt ?? "No prompt stored.",
-      response: log.response ?? "No response stored.",
-      handoverRequired: log.handoverRequired,
-      createdAt: log.createdAt,
-    }));
+    return logs.map(toStaffAiLogSummary);
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
     if (!canUseDemoStaffData()) return [];
@@ -379,10 +496,135 @@ export async function getStaffAiLogs() {
         prompt: "Customer asks for allergen-safe vegetarian dishes.",
         response: "Suggested vegetarian dishes and escalated for allergy confirmation.",
         handoverRequired: true,
+        handoverReason: "Customer asked for allergy confirmation.",
+        handoverRuleName: "Allergy confirmation",
+        retrievedManualCount: 1,
+        retrievedDocumentChunkCount: 1,
         createdAt: new Date(Date.now() - 21 * 60 * 1000),
       },
     ];
   }
+}
+
+export async function getStaffAiLogDetail(logId: number) {
+  try {
+    const logs = await prisma.$queryRaw<StaffAiLogRow[]>`
+      SELECT
+        logs."id",
+        tables."table_number" AS "tableNumber",
+        logs."model_name" AS "modelName",
+        logs."prompt",
+        logs."response",
+        logs."retrieved_context" AS "retrievedContext",
+        logs."retrieved_knowledge" AS "retrievedKnowledge",
+        logs."handover_required" AS "handoverRequired",
+        logs."handover_reason" AS "handoverReason",
+        rules."name" AS "handoverRuleName",
+        rules."category" AS "handoverRuleCategory",
+        rules."request_type" AS "handoverRequestType",
+        sessions."id" AS "sessionId",
+        sessions."status" AS "sessionStatus",
+        customer_messages."message_content" AS "customerMessage",
+        ai_messages."message_content" AS "aiMessage",
+        logs."created_at" AS "createdAt"
+      FROM "ai_response_logs" logs
+      LEFT JOIN "customer_sessions" sessions
+        ON sessions."id" = logs."session_id"
+      LEFT JOIN "restaurant_tables" tables
+        ON tables."id" = sessions."table_id"
+      LEFT JOIN "chat_messages" customer_messages
+        ON customer_messages."id" = logs."customer_message_id"
+      LEFT JOIN "chat_messages" ai_messages
+        ON ai_messages."id" = logs."ai_message_id"
+      LEFT JOIN "handover_rules" rules
+        ON rules."id" = logs."handover_rule_id"
+      WHERE logs."id" = ${logId}
+      LIMIT 1
+    `;
+
+    const log = logs[0];
+    if (!log) return null;
+
+    return toStaffAiLogDetail(log);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseDemoStaffData()) return null;
+
+    return {
+      id: 1,
+      tableNumber: "4",
+      modelName: "gemini",
+      prompt: "Customer asks for allergen-safe vegetarian dishes.",
+      response: "Suggested vegetarian dishes and escalated for allergy confirmation.",
+      handoverRequired: true,
+      handoverReason: "Customer asked for allergy confirmation.",
+      handoverRuleName: "Allergy confirmation",
+      handoverRuleCategory: "allergy",
+      handoverRequestType: "allergy_confirmation",
+      retrievedManualCount: 1,
+      retrievedDocumentChunkCount: 1,
+      createdAt: new Date(Date.now() - 21 * 60 * 1000),
+      sessionId: 1,
+      sessionStatus: "waiting_staff",
+      customerMessage: "Which dishes are vegetarian and do not contain sesame?",
+      aiMessage: "Suggested vegetarian dishes and escalated for allergy confirmation.",
+      retrievedContext:
+        "Retrieved restaurant knowledge includes allergy confirmation policy and uploaded allergen guide.",
+      retrievedKnowledge: {
+        manualEntries: [
+          {
+            id: 1,
+            title: "Allergy policy",
+            category: "allergy",
+            content: "Staff must confirm allergy questions before guests order.",
+            score: 1,
+          },
+        ],
+        documentChunks: [
+          {
+            id: 1,
+            documentId: 1,
+            documentTitle: "allergy-guide.pdf",
+            chunkIndex: 0,
+            content: "Sesame-free vegetarian options must be checked with staff.",
+            score: 0.8,
+          },
+        ],
+      },
+    };
+  }
+}
+
+function toStaffAiLogSummary(log: StaffAiLogRow): StaffAiLogSummary {
+  const retrievedKnowledge = parseRetrievedKnowledge(log.retrievedKnowledge);
+
+  return {
+    id: log.id,
+    tableNumber: log.tableNumber ?? "Unassigned",
+    modelName: log.modelName ?? "Unknown model",
+    prompt: log.prompt ?? "No prompt stored.",
+    response: log.response ?? "No response stored.",
+    handoverRequired: log.handoverRequired,
+    handoverReason: log.handoverReason,
+    handoverRuleName: log.handoverRuleName,
+    retrievedManualCount: retrievedKnowledge.manualEntries.length,
+    retrievedDocumentChunkCount: retrievedKnowledge.documentChunks.length,
+    createdAt: log.createdAt,
+  };
+}
+
+function toStaffAiLogDetail(log: StaffAiLogRow): StaffAiLogDetail {
+  return {
+    ...toStaffAiLogSummary(log),
+    sessionId: log.sessionId,
+    sessionStatus: log.sessionStatus,
+    customerMessage: log.customerMessage ?? "No customer message linked.",
+    aiMessage: log.aiMessage ?? "No AI message linked.",
+    retrievedContext: log.retrievedContext ?? "No retrieved context stored.",
+    retrievedKnowledge: parseRetrievedKnowledge(log.retrievedKnowledge),
+    handoverRuleCategory: log.handoverRuleCategory,
+    handoverRequestType: log.handoverRequestType,
+  };
 }
 
 export async function getStaffSettingsData(): Promise<StaffSettingsData> {
