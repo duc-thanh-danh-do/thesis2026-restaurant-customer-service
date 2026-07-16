@@ -8,6 +8,7 @@ import {
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
 import { buildCustomerContext, buildGeminiPrompt } from "@/lib/ai/chat-prompt";
+import { buildGroundedContextForAi } from "@/lib/ai/grounded-context";
 import { logger } from "@/lib/logger";
 import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
@@ -23,6 +24,10 @@ import {
   createUnconfirmedOrder,
   serializeOrderDraft,
 } from "@/services/customer-order.service";
+import {
+  formatRetrievedKnowledge,
+  retrieveRelevantKnowledge,
+} from "@/services/knowledge-retrieval.service";
 
 const ACTIVE_SESSION_STATUSES = new Set(["active", "waiting_staff"]);
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -64,7 +69,14 @@ export async function sendCustomerChatMessage({
       customerMessage.id,
     );
     const customerContext = await getCustomerContext(session.id);
-    const groundedContext = buildGroundedContext(restaurant);
+    const retrievedKnowledge = await retrieveRelevantKnowledge({
+      restaurantId: session.restaurantId,
+      query: message,
+    });
+    const groundedContext = buildGroundedContextForAi(
+      restaurant,
+      formatRetrievedKnowledge(retrievedKnowledge),
+    );
     const prompt = buildGeminiPrompt({
       groundedContext,
       customerContext,
@@ -236,55 +248,6 @@ type RestaurantContext = Prisma.RestaurantGetPayload<{
     knowledgeBase: true;
   };
 }>;
-
-function buildGroundedContext(restaurant: RestaurantContext) {
-  const menuItems =
-    restaurant.menuItems.length > 0
-      ? restaurant.menuItems
-          .map((item) => {
-            const allergens = item.menuItemAllergens
-              .map(({ allergen }) => allergen.name)
-              .join(", ");
-
-            return [
-              `- ${item.name}`,
-              `  Description: ${item.description ?? "Not available"}`,
-              `  Category: ${item.category ?? "Not available"}`,
-              `  Price: ${item.price.toString()}`,
-              `  Available: ${item.isAvailable ? "yes" : "no"}`,
-              `  Dietary tags: ${item.dietary ?? "None"}`,
-              `  Ingredients: ${item.ingredients ?? "Not available"}`,
-              `  Allergens: ${allergens || "None listed"}`,
-            ].join("\n");
-          })
-          .join("\n\n")
-      : "No menu items are available in the provided data.";
-
-  const knowledgeBase =
-    restaurant.knowledgeBase.length > 0
-      ? restaurant.knowledgeBase
-          .map((record) =>
-            [
-              `- ${record.title}`,
-              `  Category: ${record.category ?? "Not available"}`,
-              `  Content: ${record.content}`,
-            ].join("\n"),
-          )
-          .join("\n\n")
-      : "No active restaurant knowledge base records are available.";
-
-  return [
-    `Restaurant: ${restaurant.name}`,
-    `Description: ${restaurant.description ?? "Not available"}`,
-    `Address: ${restaurant.address ?? "Not available"}`,
-    "",
-    "Menu items:",
-    menuItems,
-    "",
-    "Restaurant knowledge base:",
-    knowledgeBase,
-  ].join("\n");
-}
 
 async function getConversationHistory(
   sessionId: number,
