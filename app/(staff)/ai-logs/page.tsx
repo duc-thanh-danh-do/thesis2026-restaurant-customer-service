@@ -1,10 +1,12 @@
 import AIResponseLogTable from "@/components/ai/AIResponseLogTable";
+import { requireStaffUser } from "@/lib/auth";
 import { getStaffAiLogs } from "@/lib/staff-page-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function AiLogsPage() {
-  const logs = await getStaffAiLogs();
+  const staffUser = await requireStaffUser();
+  const logs = await getStaffAiLogs(staffUser.restaurantId);
   const handovers = logs.filter((log) => log.handoverRequired).length;
   const models = new Set(logs.map((log) => log.modelName)).size;
 

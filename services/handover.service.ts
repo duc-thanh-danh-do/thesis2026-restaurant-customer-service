@@ -6,6 +6,7 @@ export {
 } from "@/services/handover/ai-log";
 export {
   buildHandoverReply,
+  buildUnrecordedHandoverReply,
 } from "@/services/handover/reply";
 export {
   createStaffHandover,

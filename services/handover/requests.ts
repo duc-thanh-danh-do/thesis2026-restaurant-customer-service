@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
 import {
   OPEN_REQUEST_STATUSES,
   type HandoverDecision,
@@ -15,38 +14,58 @@ export async function createStaffHandover({
   decision: HandoverDecision;
 }) {
   if (!decision.required || !decision.requestType) return null;
+  const requestType = decision.requestType;
 
-  const existingRequest = await prisma.customerRequest.findFirst({
-    where: {
-      sessionId,
-      requestType: decision.requestType,
-      status: { in: OPEN_REQUEST_STATUSES },
-    },
-    orderBy: { id: "desc" },
-  });
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${sessionId})`;
 
-  const request =
-    existingRequest ??
-    (await prisma.customerRequest.create({
-      data: {
+    const session = await tx.customerSession.findUnique({
+      where: { id: sessionId },
+      select: { diningSessionId: true, restaurantId: true },
+    });
+    if (!session) throw new Error("Customer session was not found for handover.");
+
+    const existingRequest = await tx.customerRequest.findFirst({
+      where: {
         sessionId,
-        requestType: decision.requestType,
-        status: "pending",
-        description: buildHandoverDescription(customerMessage, decision),
-        createdAt: new Date(),
+        requestType,
+        status: { in: OPEN_REQUEST_STATUSES },
       },
-    }));
+      orderBy: { id: "desc" },
+    });
 
-  await prisma.customerSession.update({
-    where: { id: sessionId },
-    data: { status: "waiting_staff" },
+    const request =
+      existingRequest ??
+      (await tx.customerRequest.create({
+        data: {
+          sessionId,
+          requestType,
+          status: "pending",
+          description: buildHandoverDescription(customerMessage, decision),
+          createdAt: new Date(),
+        },
+      }));
+
+    await tx.customerSession.update({
+      where: { id: sessionId },
+      data: { status: "waiting_staff" },
+    });
+    const diningSessionUpdate = await tx.diningSession.updateMany({
+      where: {
+        id: session.diningSessionId,
+        restaurantId: session.restaurantId,
+      },
+      data: { status: "waiting_staff" },
+    });
+    if (diningSessionUpdate.count !== 1) {
+      throw new Error("Dining session was not updated for handover.");
+    }
+
+    return {
+      requestId: request.id,
+      created: !existingRequest,
+    };
   });
-  await markDiningSessionWaitingForStaff(sessionId);
-
-  return {
-    requestId: request.id,
-    created: !existingRequest,
-  };
 }
 
 function buildHandoverDescription(
@@ -60,20 +79,4 @@ function buildHandoverDescription(
   ]
     .filter(Boolean)
     .join(" ");
-}
-
-async function markDiningSessionWaitingForStaff(sessionId: number) {
-  try {
-    await prisma.$executeRaw`
-      UPDATE "dining_sessions"
-      SET "status" = 'waiting_staff'
-      WHERE "id" = (
-        SELECT "dining_session_id"
-        FROM "customer_sessions"
-        WHERE "id" = ${sessionId}
-      )
-    `;
-  } catch (error) {
-    logger.error("Failed to mark dining session as waiting_staff", error);
-  }
 }

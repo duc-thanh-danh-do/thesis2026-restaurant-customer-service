@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { HttpError } from "@/lib/http-errors";
 import {
+  canUseCustomerFallbackData,
   fallbackKnowledgeBase,
   fallbackMenuItems,
   fallbackRestaurant,
@@ -16,6 +17,7 @@ import { generateAiText } from "@/services/ai-assistant.service";
 import { createCustomerSession } from "@/services/customer-session.service";
 import {
   buildHandoverReply,
+  buildUnrecordedHandoverReply,
   createStaffHandover,
   evaluateHandover,
   updateAiLogHandoverReason,
@@ -29,6 +31,7 @@ import {
   formatRetrievedKnowledge,
   retrieveRelevantKnowledge,
 } from "@/services/knowledge-retrieval.service";
+import { getPublishedInstruction } from "@/services/admin-instruction.service";
 
 const ACTIVE_SESSION_STATUSES = new Set(["active", "waiting_staff"]);
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -65,21 +68,19 @@ export async function sendCustomerChatMessage({
       throw new HttpError("Restaurant not found", "RESTAURANT_NOT_FOUND", 404);
     }
 
-    const conversationHistory = await getConversationHistory(
-      session.id,
-      customerMessage.id,
-    );
-    const customerContext = await getCustomerContext(session.id);
-    const retrievedKnowledge = await retrieveRelevantKnowledge({
-      restaurantId: session.restaurantId,
-      query: message,
-    });
+    const [conversationHistory, customerContext, retrievedKnowledge, publishedInstruction] = await Promise.all([
+      getConversationHistory(session.id, customerMessage.id),
+      getCustomerContext(session.id),
+      retrieveRelevantKnowledge({ restaurantId: session.restaurantId, query: message }),
+      getPublishedInstruction(session.restaurantId),
+    ]);
     const retrievedKnowledgeLog = buildRetrievedKnowledgeLog(retrievedKnowledge);
     const groundedContext = buildGroundedContextForAi(
       restaurant,
       formatRetrievedKnowledge(retrievedKnowledge),
     );
     const prompt = buildGeminiPrompt({
+      instructionPrompt: publishedInstruction?.prompt,
       groundedContext,
       customerContext,
       conversationHistory,
@@ -132,6 +133,7 @@ export async function sendCustomerChatMessage({
         prompt,
         response: finalReply,
         handoverRequired: handoverDecision.required,
+        instructionVersionId: publishedInstruction?.id,
         createdAt: new Date(),
       },
     });
@@ -152,6 +154,9 @@ export async function sendCustomerChatMessage({
     };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) throw error;
+    if (!canUseCustomerFallbackData()) {
+      throw new HttpError("Customer chat is temporarily unavailable.", "DATABASE_UNAVAILABLE", 503);
+    }
 
     const groundedContext = buildFallbackGroundedContext();
     const prompt = buildGeminiPrompt({
@@ -168,7 +173,7 @@ export async function sendCustomerChatMessage({
 
     return {
       reply: handoverDecision.required
-        ? buildHandoverReply(reply, handoverDecision)
+        ? buildUnrecordedHandoverReply(reply, handoverDecision)
         : reply,
       handoverRequired: handoverDecision.required,
       requestId: null,

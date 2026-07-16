@@ -495,7 +495,9 @@ export async function getStaffTableDetail(tableId: number) {
   return tables.find((table) => table.id === tableId) ?? null;
 }
 
-export async function getStaffAiLogs(): Promise<StaffAiLogSummary[]> {
+export async function getStaffAiLogs(
+  restaurantId: number,
+): Promise<StaffAiLogSummary[]> {
   try {
     const logs = await prisma.$queryRaw<StaffAiLogRow[]>`
       SELECT
@@ -527,6 +529,7 @@ export async function getStaffAiLogs(): Promise<StaffAiLogSummary[]> {
         ON ai_messages."id" = logs."ai_message_id"
       LEFT JOIN "handover_rules" rules
         ON rules."id" = logs."handover_rule_id"
+      WHERE sessions."restaurant_id" = ${restaurantId}
       ORDER BY logs."id" DESC
       LIMIT 40
     `;
@@ -556,6 +559,7 @@ export async function getStaffAiLogs(): Promise<StaffAiLogSummary[]> {
 
 export async function getStaffAiLogDetail(
   logId: number,
+  restaurantId: number,
 ): Promise<StaffAiLogDetail | null> {
   try {
     const logs = await prisma.$queryRaw<StaffAiLogRow[]>`
@@ -589,6 +593,7 @@ export async function getStaffAiLogDetail(
       LEFT JOIN "handover_rules" rules
         ON rules."id" = logs."handover_rule_id"
       WHERE logs."id" = ${logId}
+        AND sessions."restaurant_id" = ${restaurantId}
       LIMIT 1
     `;
 

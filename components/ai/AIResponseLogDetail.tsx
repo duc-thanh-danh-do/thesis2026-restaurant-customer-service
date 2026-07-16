@@ -31,11 +31,17 @@ function formatScore(value: number) {
   return value.toFixed(3);
 }
 
-export default async function AIResponseLogDetail({ logId }: { logId: string }) {
+export default async function AIResponseLogDetail({
+  logId,
+  restaurantId,
+}: {
+  logId: string;
+  restaurantId: number;
+}) {
   const parsedLogId = Number(logId);
   if (!Number.isInteger(parsedLogId)) notFound();
 
-  const log = await getStaffAiLogDetail(parsedLogId);
+  const log = await getStaffAiLogDetail(parsedLogId, restaurantId);
   if (!log) notFound();
 
   return (
