@@ -195,6 +195,7 @@ model KnowledgeDocumentChunk {
   documentId Int               @map("document_id")
   chunkIndex Int               @map("chunk_index")
   content    String            @db.Text
+  embedding  Unsupported("vector(768)")?
   createdAt  DateTime?         @map("created_at")
   document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

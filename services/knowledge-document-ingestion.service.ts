@@ -1,4 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { isDatabaseUnavailable } from "@/lib/fallback-data";
+import { logger } from "@/lib/logger";
+import {
+  buildDocumentEmbeddingInput,
+  formatPgVector,
+  generateKnowledgeEmbedding,
+} from "@/services/knowledge-embedding.service";
 import {
   getKnowledgeDocumentFileExtension,
   validateKnowledgeDocumentFile,
@@ -19,6 +26,11 @@ export type KnowledgeDocumentIngestionResult = {
 
 type KnowledgeDocumentRow = {
   id: number;
+};
+
+type KnowledgeDocumentChunkRow = {
+  id: number;
+  content: string;
 };
 
 type PdfParseModule = {
@@ -79,7 +91,12 @@ export async function ingestKnowledgeDocument({
       throw new Error("Document does not contain readable text.");
     }
 
-    await replaceDocumentChunks(documentId, chunks);
+    const insertedChunks = await replaceDocumentChunks(documentId, chunks);
+    await storeDocumentChunkEmbeddings({
+      documentId,
+      documentTitle: file.name,
+      chunks: insertedChunks,
+    });
     await markDocumentStatus(documentId, "ready");
 
     return {
@@ -174,8 +191,10 @@ async function replaceDocumentChunks(documentId: number, chunks: string[]) {
     WHERE "document_id" = ${documentId}
   `;
 
+  const insertedChunks: KnowledgeDocumentChunkRow[] = [];
+
   for (const [index, chunk] of chunks.entries()) {
-    await prisma.$executeRaw`
+    const [insertedChunk] = await prisma.$queryRaw<KnowledgeDocumentChunkRow[]>`
       INSERT INTO "knowledge_document_chunks" (
         "document_id",
         "chunk_index",
@@ -188,8 +207,61 @@ async function replaceDocumentChunks(documentId: number, chunks: string[]) {
         ${chunk},
         NOW()
       )
+      RETURNING "id", "content"
     `;
+
+    insertedChunks.push(insertedChunk);
   }
+
+  return insertedChunks;
+}
+
+async function storeDocumentChunkEmbeddings({
+  documentId,
+  documentTitle,
+  chunks,
+}: {
+  documentId: number;
+  documentTitle: string;
+  chunks: KnowledgeDocumentChunkRow[];
+}) {
+  try {
+    for (const chunk of chunks) {
+      const embedding = await generateKnowledgeEmbedding(
+        buildDocumentEmbeddingInput({
+          title: documentTitle,
+          content: chunk.content,
+        }),
+      );
+
+      await updateChunkEmbedding(chunk.id, formatPgVector(embedding));
+    }
+  } catch (error) {
+    if (!isExpectedEmbeddingStorageGap(error)) {
+      logger.warn(
+        `Knowledge document ${documentId} was ingested without embeddings.`,
+        error,
+      );
+    }
+  }
+}
+
+async function updateChunkEmbedding(chunkId: number, embeddingVector: string) {
+  await prisma.$executeRaw`
+    UPDATE "knowledge_document_chunks"
+    SET "embedding" = ${embeddingVector}::vector
+    WHERE "id" = ${chunkId}
+  `;
+}
+
+function isExpectedEmbeddingStorageGap(error: unknown) {
+  return (
+    !process.env.GEMINI_API_KEY?.trim() ||
+    isDatabaseUnavailable(error) ||
+    (error instanceof Error &&
+      error.message.includes("embedding") &&
+      error.message.includes("does not exist"))
+  );
 }
 
 async function markDocumentStatus(
