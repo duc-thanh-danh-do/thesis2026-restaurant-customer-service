@@ -1,14 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import {
+  getKnowledgeDocumentFileExtension,
+  validateKnowledgeDocumentFile,
+} from "@/services/knowledge-document-validation";
 
-const ACCEPTED_EXTENSIONS = new Set([".txt", ".md"]);
-const ACCEPTED_MIME_TYPES = new Set([
-  "",
-  "application/octet-stream",
-  "text/markdown",
-  "text/plain",
-  "text/x-markdown",
-]);
-const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+export { validateKnowledgeDocumentFile };
+
 const DEFAULT_CHUNK_SIZE = 1000;
 const MIN_CHUNK_SIZE = 800;
 
@@ -22,6 +19,16 @@ export type KnowledgeDocumentIngestionResult = {
 
 type KnowledgeDocumentRow = {
   id: number;
+};
+
+type PdfParseModule = {
+  default?: (buffer: Buffer) => Promise<{ text?: string }>;
+  PDFParse?: new (options: {
+    data: Buffer;
+  }) => {
+    getText: () => Promise<{ text?: string }>;
+    destroy?: () => Promise<void> | void;
+  };
 };
 
 export async function ingestKnowledgeDocument({
@@ -63,7 +70,9 @@ export async function ingestKnowledgeDocument({
     `;
 
     documentId = document.id;
-    const text = normalizeKnowledgeDocumentText(await file.text());
+    const text = normalizeKnowledgeDocumentText(
+      await extractKnowledgeDocumentText(file),
+    );
     const chunks = chunkKnowledgeDocumentText(text);
 
     if (chunks.length === 0) {
@@ -91,24 +100,38 @@ export async function ingestKnowledgeDocument({
   }
 }
 
-export function validateKnowledgeDocumentFile(file: File) {
-  const extension = getFileExtension(file.name);
+async function extractKnowledgeDocumentText(file: File) {
+  const extension = getKnowledgeDocumentFileExtension(file.name);
 
-  if (!ACCEPTED_EXTENSIONS.has(extension)) {
-    throw new Error("Only .txt and .md knowledge documents are supported.");
+  if (extension !== ".pdf") {
+    return file.text();
   }
 
-  if (!ACCEPTED_MIME_TYPES.has(file.type)) {
-    throw new Error("Only plain text and Markdown files are supported.");
+  return extractPdfText(file);
+}
+
+async function extractPdfText(file: File) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const pdfParsePackage = "pdf-parse";
+  const pdfParseModule = (await import(pdfParsePackage)) as PdfParseModule;
+
+  if (pdfParseModule.PDFParse) {
+    const parser = new pdfParseModule.PDFParse({ data: buffer });
+
+    try {
+      const result = await parser.getText();
+      return result.text ?? "";
+    } finally {
+      await parser.destroy?.();
+    }
   }
 
-  if (file.size <= 0) {
-    throw new Error("Document is empty.");
+  if (pdfParseModule.default) {
+    const result = await pdfParseModule.default(buffer);
+    return result.text ?? "";
   }
 
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    throw new Error("Document is too large. Maximum size is 2 MB.");
-  }
+  throw new Error("PDF parser is not available.");
 }
 
 export function normalizeKnowledgeDocumentText(value: string) {
@@ -116,6 +139,7 @@ export function normalizeKnowledgeDocumentText(value: string) {
     .replace(/^\uFEFF/, "")
     .replace(/\r\n?/g, "\n")
     .replace(/\u0000/g, "")
+    .replace(/^-- \d+ of \d+ --$/gm, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -201,11 +225,4 @@ function findChunkSplitIndex(text: string, chunkSize: number) {
   if (wordBreak >= MIN_CHUNK_SIZE) return wordBreak;
 
   return chunkSize;
-}
-
-function getFileExtension(fileName: string) {
-  const lastDotIndex = fileName.lastIndexOf(".");
-  if (lastDotIndex === -1) return "";
-
-  return fileName.slice(lastDotIndex).toLowerCase();
 }

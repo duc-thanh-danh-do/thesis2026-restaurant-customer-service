@@ -30,7 +30,7 @@ export default function KnowledgeDocumentPanel() {
 
   const handleUpload = () => {
     if (!selectedFile) {
-      showToast("Choose a .txt or .md file first");
+      showToast("Choose a .txt, .md, or .pdf file first");
       return;
     }
 
@@ -62,7 +62,7 @@ export default function KnowledgeDocumentPanel() {
               <h2 className="font-semibold text-[#142653]">Knowledge documents</h2>
             </div>
             <p className="mt-1 text-sm text-gray-500">
-              Upload plain text or Markdown files for AI knowledge ingestion.
+              Upload plain text, Markdown, or PDF files for AI knowledge ingestion.
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export default function KnowledgeDocumentPanel() {
               <input
                 ref={inputRef}
                 type="file"
-                accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
+                accept=".txt,.md,.pdf,text/plain,text/markdown,text/x-markdown,application/pdf"
                 className="sr-only"
                 disabled={isPending}
                 onChange={(event) =>
@@ -79,7 +79,7 @@ export default function KnowledgeDocumentPanel() {
                 }
               />
               <span className="truncate">
-                {selectedFile ? selectedFile.name : "Choose .txt or .md"}
+                {selectedFile ? selectedFile.name : "Choose .txt, .md, or .pdf"}
               </span>
             </label>
             <Button

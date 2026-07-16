@@ -39,7 +39,7 @@ export async function uploadKnowledgeDocumentAction(formData: FormData) {
     if (!(file instanceof File)) {
       return {
         success: false,
-        error: "Please choose a .txt or .md file to upload.",
+        error: "Please choose a .txt, .md, or .pdf file to upload.",
       };
     }
 
