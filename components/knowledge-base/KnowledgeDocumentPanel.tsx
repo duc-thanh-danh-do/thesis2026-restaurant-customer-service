@@ -1,19 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { AlertCircle, CheckCircle2, FileText, Loader2, Upload } from "lucide-react";
 import {
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  FileText,
+  Loader2,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import {
+  deleteKnowledgeDocumentAction,
   getKnowledgeDocumentsAction,
+  updateKnowledgeDocumentActiveAction,
   uploadKnowledgeDocumentAction,
   type KnowledgeDocument,
 } from "@/actions/knowledge-document.action";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import Toast, { useToast } from "@/components/ui/Toast";
 
 export default function KnowledgeDocumentPanel() {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    id: 0,
+    title: "",
+  });
   const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { toastMessage, showToast } = useToast();
@@ -48,6 +65,44 @@ export default function KnowledgeDocumentPanel() {
       } else {
         showToast(result.error ?? "Upload failed");
         fetchDocuments();
+      }
+    });
+  };
+
+  const handleToggleActive = (document: KnowledgeDocument) => {
+    const nextActive = !document.isActive;
+
+    startTransition(async () => {
+      const result = await updateKnowledgeDocumentActiveAction(
+        document.id,
+        nextActive,
+      );
+
+      if (result.success) {
+        showToast(
+          nextActive
+            ? `Activated ${document.originalFilename}`
+            : `Deactivated ${document.originalFilename}`,
+        );
+        fetchDocuments();
+      } else {
+        showToast(result.error ?? "Failed to update document");
+      }
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    const { id, title } = deleteModal;
+
+    startTransition(async () => {
+      setDeleteModal({ isOpen: false, id: 0, title: "" });
+      const result = await deleteKnowledgeDocumentAction(id);
+
+      if (result.success) {
+        showToast(`Deleted ${title}`);
+        fetchDocuments();
+      } else {
+        showToast(result.error ?? "Failed to delete document");
       }
     });
   };
@@ -120,9 +175,14 @@ export default function KnowledgeDocumentPanel() {
                       {document.originalFilename}
                     </h3>
                     <StatusBadge status={document.status} />
+                    {!document.isActive ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                        Inactive
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-1 text-sm text-gray-500">
-                    {formatFileSize(document.fileSize)} · {document.mimeType} ·{" "}
+                    {formatFileSize(document.fileSize)} - {document.mimeType} -{" "}
                     {document.chunkCount} chunks
                   </p>
                   {document.errorMessage ? (
@@ -136,12 +196,70 @@ export default function KnowledgeDocumentPanel() {
                     ? new Date(document.updatedAt).toLocaleDateString()
                     : "No date"}
                 </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleToggleActive(document)}
+                    disabled={isPending || document.status !== "ready"}
+                    title={
+                      document.isActive
+                        ? "Deactivate document"
+                        : "Activate document"
+                    }
+                    className="p-2 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    {document.isActive ? (
+                      <EyeOff
+                        className="h-4 w-4 text-slate-500"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Eye
+                        className="h-4 w-4 text-slate-500"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className="sr-only">
+                      {document.isActive ? "Deactivate" : "Activate"} document
+                    </span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setDeleteModal({
+                        isOpen: true,
+                        id: document.id,
+                        title: document.originalFilename,
+                      })
+                    }
+                    disabled={isPending}
+                    title="Delete document"
+                    className="p-2 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2
+                      className="h-4 w-4 text-red-400"
+                      aria-hidden="true"
+                    />
+                    <span className="sr-only">Delete document</span>
+                  </Button>
+                </div>
               </div>
             </Card>
           ))
         )}
       </div>
 
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        name={deleteModal.title}
+        title="Delete Knowledge Document"
+        onCancel={() => setDeleteModal({ isOpen: false, id: 0, title: "" })}
+        onConfirm={handleConfirmDelete}
+      />
       <Toast message={toastMessage} />
     </section>
   );

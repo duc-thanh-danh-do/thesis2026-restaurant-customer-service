@@ -206,6 +206,7 @@ async function retrieveDocumentChunks({
       ON documents."id" = chunks."document_id"
     WHERE documents."restaurant_id" = ${restaurantId}
       AND documents."status" = 'ready'
+      AND documents."is_active" = true
       AND (
         to_tsvector('simple', documents."original_filename" || ' ' || chunks."content")
           @@ websearch_to_tsquery('simple', ${query})

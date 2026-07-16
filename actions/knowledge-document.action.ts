@@ -11,6 +11,7 @@ type KnowledgeDocumentRow = {
   mimeType: string;
   fileSize: number;
   status: string;
+  isActive: boolean;
   errorMessage: string | null;
   uploadedByName: string | null;
   chunkCount: bigint | number | string;
@@ -24,6 +25,7 @@ export type KnowledgeDocument = {
   mimeType: string;
   fileSize: number;
   status: string;
+  isActive: boolean;
   errorMessage: string | null;
   uploadedByName: string | null;
   chunkCount: number;
@@ -79,6 +81,7 @@ export async function getKnowledgeDocumentsAction(): Promise<KnowledgeDocument[]
         documents."mime_type" AS "mimeType",
         documents."file_size" AS "fileSize",
         documents."status",
+        documents."is_active" AS "isActive",
         documents."error_message" AS "errorMessage",
         staff_users."name" AS "uploadedByName",
         COUNT(chunks."id") AS "chunkCount",
@@ -101,5 +104,75 @@ export async function getKnowledgeDocumentsAction(): Promise<KnowledgeDocument[]
   } catch (error) {
     console.error("Failed to fetch knowledge documents:", error);
     return [];
+  }
+}
+
+export async function updateKnowledgeDocumentActiveAction(
+  documentId: number,
+  isActive: boolean,
+) {
+  try {
+    const staffUser = await requireAdminUser();
+    const result = await prisma.$executeRaw`
+      UPDATE "knowledge_documents"
+      SET
+        "is_active" = ${isActive},
+        "updated_at" = NOW()
+      WHERE "id" = ${documentId}
+        AND "restaurant_id" = ${staffUser.restaurantId}
+    `;
+
+    if (Number(result) === 0) {
+      return {
+        success: false,
+        error: "Document was not found.",
+      };
+    }
+
+    revalidatePath("/knowledge-base");
+    revalidatePath("/settings");
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error("Failed to update knowledge document:", error);
+
+    return {
+      success: false,
+      error: "Failed to update knowledge document.",
+    };
+  }
+}
+
+export async function deleteKnowledgeDocumentAction(documentId: number) {
+  try {
+    const staffUser = await requireAdminUser();
+    const result = await prisma.$executeRaw`
+      DELETE FROM "knowledge_documents"
+      WHERE "id" = ${documentId}
+        AND "restaurant_id" = ${staffUser.restaurantId}
+    `;
+
+    if (Number(result) === 0) {
+      return {
+        success: false,
+        error: "Document was not found.",
+      };
+    }
+
+    revalidatePath("/knowledge-base");
+    revalidatePath("/settings");
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error("Failed to delete knowledge document:", error);
+
+    return {
+      success: false,
+      error: "Failed to delete knowledge document.",
+    };
   }
 }

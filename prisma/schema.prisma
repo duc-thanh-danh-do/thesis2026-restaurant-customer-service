@@ -177,6 +177,7 @@ model KnowledgeDocument {
   mimeType         String                   @map("mime_type") @db.VarChar(255)
   fileSize         Int                      @map("file_size")
   status           String                   @db.VarChar(50)
+  isActive         Boolean                  @default(true) @map("is_active")
   errorMessage     String?                  @map("error_message") @db.Text
   createdAt        DateTime?                @map("created_at")
   updatedAt        DateTime?                @map("updated_at")
@@ -184,7 +185,7 @@ model KnowledgeDocument {
   uploadedBy       StaffUser?               @relation(fields: [uploadedByStaffId], references: [id])
   chunks           KnowledgeDocumentChunk[]
 
-  @@index([restaurantId, status])
+  @@index([restaurantId, status, isActive])
   @@index([uploadedByStaffId])
   @@map("knowledge_documents")
 }
