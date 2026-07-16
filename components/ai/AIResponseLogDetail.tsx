@@ -7,10 +7,14 @@ import {
   FileText,
   type LucideIcon,
   MessageSquare,
+  Search,
   ShieldAlert,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { getStaffAiLogDetail } from "@/lib/staff-page-data";
+import {
+  getStaffAiLogDetail,
+  type StaffAiRetrievedKnowledge,
+} from "@/lib/staff-page-data";
 
 function dateLabel(value: Date | null) {
   if (!value) return "No timestamp";
@@ -58,6 +62,7 @@ export default async function AIResponseLogDetail({ logId }: { logId: string }) 
         <div className="flex flex-wrap gap-2">
           <Metric label="Manual KB" value={log.retrievedManualCount} />
           <Metric label="Doc Chunks" value={log.retrievedDocumentChunkCount} />
+          <RetrievalModeBadge mode={log.documentRetrievalMode} />
           <span
             className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
               log.handoverRequired
@@ -107,6 +112,9 @@ export default async function AIResponseLogDetail({ logId }: { logId: string }) 
         </Panel>
 
         <Panel title="Document Chunk Matches" icon={FileText}>
+          <div className="mb-3">
+            <RetrievalModeBadge mode={log.documentRetrievalMode} />
+          </div>
           {log.retrievedKnowledge.documentChunks.length === 0 ? (
             <EmptyText>No uploaded document chunks were retrieved.</EmptyText>
           ) : (
@@ -115,7 +123,7 @@ export default async function AIResponseLogDetail({ logId }: { logId: string }) 
                 <EvidenceItem
                   key={chunk.id}
                   title={`${chunk.documentTitle} (chunk ${chunk.chunkIndex + 1})`}
-                  meta={`Document #${chunk.documentId} - Score: ${formatScore(chunk.score)}`}
+                  meta={`Document #${chunk.documentId} - ${chunk.scoreLabel || formatScore(chunk.score)}`}
                   content={chunk.content}
                 />
               ))}
@@ -157,6 +165,34 @@ export default async function AIResponseLogDetail({ logId }: { logId: string }) 
         </Panel>
       </section>
     </div>
+  );
+}
+
+function RetrievalModeBadge({
+  mode,
+}: {
+  mode: StaffAiRetrievedKnowledge["documentRetrievalMode"];
+}) {
+  const label =
+    mode === "vector"
+      ? "Vector retrieval"
+      : mode === "keyword"
+        ? "Keyword retrieval"
+        : "No document matches";
+  const className =
+    mode === "vector"
+      ? "bg-blue-50 text-blue-700"
+      : mode === "keyword"
+        ? "bg-slate-100 text-slate-600"
+        : "bg-gray-50 text-gray-500";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${className}`}
+    >
+      <Search className="h-4 w-4" aria-hidden="true" />
+      {label}
+    </span>
   );
 }
 

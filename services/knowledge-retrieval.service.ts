@@ -1,7 +1,14 @@
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
 import { logger } from "@/lib/logger";
+import {
+  buildQueryEmbeddingInput,
+  formatPgVector,
+  generateKnowledgeEmbedding,
+} from "@/services/knowledge-embedding.service";
 
 const DEFAULT_RESULT_LIMIT = 4;
+
+export type DocumentRetrievalMode = "vector" | "keyword" | "none";
 
 export type RetrievedKnowledgeEntry = {
   id: number;
@@ -18,11 +25,13 @@ export type RetrievedDocumentChunk = {
   chunkIndex: number;
   content: string;
   score: number;
+  retrievalMode: Exclude<DocumentRetrievalMode, "none">;
 };
 
 export type RetrievedKnowledge = {
   entries: RetrievedKnowledgeEntry[];
   documentChunks: RetrievedDocumentChunk[];
+  documentRetrievalMode: DocumentRetrievalMode;
 };
 
 export type RetrievedKnowledgeLog = {
@@ -40,7 +49,10 @@ export type RetrievedKnowledgeLog = {
     chunkIndex: number;
     content: string;
     score: number;
+    retrievalMode: Exclude<DocumentRetrievalMode, "none">;
+    scoreLabel: string;
   }>;
+  documentRetrievalMode: DocumentRetrievalMode;
 };
 
 type KnowledgeEntryRow = RetrievedKnowledgeEntry;
@@ -58,22 +70,26 @@ export async function retrieveRelevantKnowledge({
   const terms = extractSearchTerms(query);
 
   if (terms.length === 0) {
-    return { entries: [], documentChunks: [] };
+    return { entries: [], documentChunks: [], documentRetrievalMode: "none" };
   }
 
   try {
-    const [entries, documentChunks] = await Promise.all([
+    const [entries, documentChunkResult] = await Promise.all([
       retrieveKnowledgeEntries({ restaurantId, query, terms, limit }),
       retrieveDocumentChunks({ restaurantId, query, terms, limit }),
     ]);
 
-    return { entries, documentChunks };
+    return {
+      entries,
+      documentChunks: documentChunkResult.chunks,
+      documentRetrievalMode: documentChunkResult.mode,
+    };
   } catch (error) {
     if (!isDatabaseUnavailable(error)) {
       logger.error("Failed to retrieve relevant knowledge", error);
     }
 
-    return { entries: [], documentChunks: [] };
+    return { entries: [], documentChunks: [], documentRetrievalMode: "none" };
   }
 }
 
@@ -119,6 +135,10 @@ export function extractSearchTerms(query: string) {
 
 export function buildKeywordPattern(terms: string[]) {
   return `%${terms.map(escapeLikeTerm).join("%")}%`;
+}
+
+export function cosineDistanceToSimilarity(distance: number) {
+  return 1 - distance;
 }
 
 export function formatRetrievedKnowledge(knowledge: RetrievedKnowledge) {
@@ -174,8 +194,22 @@ export function buildRetrievedKnowledgeLog(
       chunkIndex: chunk.chunkIndex,
       content: chunk.content,
       score: chunk.score,
+      retrievalMode: chunk.retrievalMode,
+      scoreLabel: formatDocumentChunkScoreLabel(chunk),
     })),
+    documentRetrievalMode: knowledge.documentRetrievalMode,
   };
+}
+
+export function formatDocumentChunkScoreLabel(chunk: RetrievedDocumentChunk) {
+  return chunk.retrievalMode === "vector"
+    ? `Vector similarity: ${formatRetrievalScore(chunk.score)}`
+    : `Keyword score: ${formatRetrievalScore(chunk.score)}`;
+}
+
+export function formatRetrievalScore(score: number) {
+  if (!Number.isFinite(score)) return "0.000";
+  return score.toFixed(3);
 }
 
 async function retrieveKnowledgeEntries({
@@ -227,6 +261,94 @@ async function retrieveDocumentChunks({
   query: string;
   terms: string[];
   limit: number;
+}): Promise<{ chunks: RetrievedDocumentChunk[]; mode: DocumentRetrievalMode }> {
+  const vectorRows = await retrieveDocumentChunksByVector({
+    restaurantId,
+    query,
+    limit,
+  });
+
+  if (vectorRows.length > 0) {
+    return {
+      chunks: vectorRows,
+      mode: "vector" satisfies DocumentRetrievalMode,
+    };
+  }
+
+  const keywordRows = await retrieveDocumentChunksByKeyword({
+    restaurantId,
+    query,
+    terms,
+    limit,
+  });
+
+  return {
+    chunks: keywordRows,
+    mode:
+      keywordRows.length > 0
+        ? ("keyword" satisfies DocumentRetrievalMode)
+        : ("none" satisfies DocumentRetrievalMode),
+  };
+}
+
+async function retrieveDocumentChunksByVector({
+  restaurantId,
+  query,
+  limit,
+}: {
+  restaurantId: number;
+  query: string;
+  limit: number;
+}) {
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const queryEmbedding = await generateKnowledgeEmbedding(
+      buildQueryEmbeddingInput(query),
+    );
+    const queryVector = formatPgVector(queryEmbedding);
+    const rows = await prisma.$queryRaw<DocumentChunkRow[]>`
+      SELECT
+        chunks."id",
+        chunks."document_id" AS "documentId",
+        documents."original_filename" AS "documentTitle",
+        chunks."chunk_index" AS "chunkIndex",
+        chunks."content",
+        (1 - (chunks."embedding" <=> ${queryVector}::vector)) AS "score"
+      FROM "knowledge_document_chunks" chunks
+      INNER JOIN "knowledge_documents" documents
+        ON documents."id" = chunks."document_id"
+      WHERE documents."restaurant_id" = ${restaurantId}
+        AND documents."status" = 'ready'
+        AND documents."is_active" = true
+        AND chunks."embedding" IS NOT NULL
+      ORDER BY chunks."embedding" <=> ${queryVector}::vector, chunks."id" ASC
+      LIMIT ${limit}
+    `;
+
+    return rows.map((row) => ({
+      ...row,
+      score: Number(row.score),
+      retrievalMode: "vector" as const,
+    }));
+  } catch (error) {
+    if (!isExpectedVectorRetrievalGap(error)) {
+      logger.warn("Vector knowledge retrieval failed; using keyword fallback.", error);
+    }
+
+    return [];
+  }
+}
+
+async function retrieveDocumentChunksByKeyword({
+  restaurantId,
+  query,
+  terms,
+  limit,
+}: {
+  restaurantId: number;
+  query: string;
+  terms: string[];
+  limit: number;
 }) {
   const { prisma } = await import("@/lib/prisma");
   const keywordPattern = buildKeywordPattern(terms);
@@ -257,7 +379,23 @@ async function retrieveDocumentChunks({
     LIMIT ${limit}
   `;
 
-  return rows.map((row) => ({ ...row, score: Number(row.score) }));
+  return rows.map((row) => ({
+    ...row,
+    score: Number(row.score),
+    retrievalMode: "keyword" as const,
+  }));
+}
+
+function isExpectedVectorRetrievalGap(error: unknown) {
+  return (
+    !process.env.GEMINI_API_KEY?.trim() ||
+    isDatabaseUnavailable(error) ||
+    (error instanceof Error &&
+      ((error.message.includes("embedding") &&
+        error.message.includes("does not exist")) ||
+        (error.message.includes("vector") &&
+          error.message.includes("does not exist"))))
+  );
 }
 
 function escapeLikeTerm(term: string) {

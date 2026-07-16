@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, Bot, FileText, ShieldAlert } from "lucide-react";
-import type { StaffAiLogSummary } from "@/lib/staff-page-data";
+import { ArrowRight, Bot, FileText, Search, ShieldAlert } from "lucide-react";
+import type {
+  StaffAiLogSummary,
+  StaffAiRetrievedKnowledge,
+} from "@/lib/staff-page-data";
 
 function shortText(value: string) {
   return value.length > 140 ? `${value.slice(0, 137)}...` : value;
@@ -53,6 +56,7 @@ export default function AIResponseLogTable({ logs }: { logs: StaffAiLogSummary[]
             <div className="flex flex-wrap gap-1.5">
               <EvidenceBadge label="KB" value={log.retrievedManualCount} />
               <EvidenceBadge label="Docs" value={log.retrievedDocumentChunkCount} />
+              <RetrievalModeBadge mode={log.documentRetrievalMode} />
               {log.handoverRuleName ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                   <ShieldAlert className="size-3" aria-hidden="true" />
@@ -72,6 +76,30 @@ export default function AIResponseLogTable({ logs }: { logs: StaffAiLogSummary[]
         ))}
       </div>
     </section>
+  );
+}
+
+function RetrievalModeBadge({
+  mode,
+}: {
+  mode: StaffAiRetrievedKnowledge["documentRetrievalMode"];
+}) {
+  const label =
+    mode === "vector" ? "Vector" : mode === "keyword" ? "Keyword" : "No docs";
+  const className =
+    mode === "vector"
+      ? "bg-blue-50 text-blue-700"
+      : mode === "keyword"
+        ? "bg-slate-100 text-slate-600"
+        : "bg-gray-50 text-gray-500";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${className}`}
+    >
+      <Search className="size-3" aria-hidden="true" />
+      {label}
+    </span>
   );
 }
 

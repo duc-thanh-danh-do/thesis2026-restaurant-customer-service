@@ -5,6 +5,7 @@ import {
   fallbackTables,
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
+import type { DocumentRetrievalMode } from "@/services/knowledge-retrieval.service";
 
 const fallbackStartedAt = new Date(Date.now() - 23 * 60 * 1000);
 
@@ -71,6 +72,7 @@ export type StaffAiLogSummary = {
   handoverRuleName: string | null;
   retrievedManualCount: number;
   retrievedDocumentChunkCount: number;
+  documentRetrievalMode: DocumentRetrievalMode;
   createdAt: Date | null;
 };
 
@@ -89,7 +91,10 @@ export type StaffAiRetrievedKnowledge = {
     chunkIndex: number;
     content: string;
     score: number;
+    retrievalMode: Exclude<DocumentRetrievalMode, "none">;
+    scoreLabel: string;
   }>;
+  documentRetrievalMode: DocumentRetrievalMode;
 };
 
 export type StaffAiLogDetail = StaffAiLogSummary & {
@@ -169,6 +174,7 @@ function emptyRetrievedKnowledge(): StaffAiRetrievedKnowledge {
   return {
     manualEntries: [],
     documentChunks: [],
+    documentRetrievalMode: "none",
   };
 }
 
@@ -179,6 +185,24 @@ function parseRetrievedKnowledge(value: unknown): StaffAiRetrievedKnowledge {
   if (!parsed || typeof parsed !== "object") return emptyRetrievedKnowledge();
 
   const candidate = parsed as Partial<StaffAiRetrievedKnowledge>;
+  const documentChunks = Array.isArray(candidate.documentChunks)
+    ? candidate.documentChunks.map((chunk) => ({
+        id: Number(chunk.id),
+        documentId: Number(chunk.documentId),
+        documentTitle: String(chunk.documentTitle ?? "Untitled document"),
+        chunkIndex: Number(chunk.chunkIndex ?? 0),
+        content: String(chunk.content ?? ""),
+        score: Number(chunk.score ?? 0),
+        retrievalMode: normalizeDocumentRetrievalMode(chunk.retrievalMode),
+        scoreLabel:
+          typeof chunk.scoreLabel === "string"
+            ? chunk.scoreLabel
+            : fallbackChunkScoreLabel(
+                normalizeDocumentRetrievalMode(chunk.retrievalMode),
+                Number(chunk.score ?? 0),
+              ),
+      }))
+    : [];
 
   return {
     manualEntries: Array.isArray(candidate.manualEntries)
@@ -190,17 +214,40 @@ function parseRetrievedKnowledge(value: unknown): StaffAiRetrievedKnowledge {
           score: Number(entry.score ?? 0),
         }))
       : [],
-    documentChunks: Array.isArray(candidate.documentChunks)
-      ? candidate.documentChunks.map((chunk) => ({
-          id: Number(chunk.id),
-          documentId: Number(chunk.documentId),
-          documentTitle: String(chunk.documentTitle ?? "Untitled document"),
-          chunkIndex: Number(chunk.chunkIndex ?? 0),
-          content: String(chunk.content ?? ""),
-          score: Number(chunk.score ?? 0),
-        }))
-      : [],
+    documentChunks,
+    documentRetrievalMode: normalizeKnowledgeRetrievalMode(
+      candidate.documentRetrievalMode,
+      documentChunks,
+    ),
   };
+}
+
+function normalizeDocumentRetrievalMode(
+  value: unknown,
+): Exclude<DocumentRetrievalMode, "none"> {
+  return value === "vector" ? "vector" : "keyword";
+}
+
+function normalizeKnowledgeRetrievalMode(
+  value: unknown,
+  documentChunks: StaffAiRetrievedKnowledge["documentChunks"],
+): DocumentRetrievalMode {
+  if (value === "vector" || value === "keyword") return value;
+  if (documentChunks.some((chunk) => chunk.retrievalMode === "vector")) {
+    return "vector";
+  }
+  if (documentChunks.length > 0) return "keyword";
+  return "none";
+}
+
+function fallbackChunkScoreLabel(
+  mode: Exclude<DocumentRetrievalMode, "none">,
+  score: number,
+) {
+  const formattedScore = Number.isFinite(score) ? score.toFixed(3) : "0.000";
+  return mode === "vector"
+    ? `Vector similarity: ${formattedScore}`
+    : `Keyword score: ${formattedScore}`;
 }
 
 function safeJsonParse(value: string) {
@@ -448,7 +495,7 @@ export async function getStaffTableDetail(tableId: number) {
   return tables.find((table) => table.id === tableId) ?? null;
 }
 
-export async function getStaffAiLogs() {
+export async function getStaffAiLogs(): Promise<StaffAiLogSummary[]> {
   try {
     const logs = await prisma.$queryRaw<StaffAiLogRow[]>`
       SELECT
@@ -500,13 +547,16 @@ export async function getStaffAiLogs() {
         handoverRuleName: "Allergy confirmation",
         retrievedManualCount: 1,
         retrievedDocumentChunkCount: 1,
+        documentRetrievalMode: "vector",
         createdAt: new Date(Date.now() - 21 * 60 * 1000),
       },
     ];
   }
 }
 
-export async function getStaffAiLogDetail(logId: number) {
+export async function getStaffAiLogDetail(
+  logId: number,
+): Promise<StaffAiLogDetail | null> {
   try {
     const logs = await prisma.$queryRaw<StaffAiLogRow[]>`
       SELECT
@@ -563,6 +613,7 @@ export async function getStaffAiLogDetail(logId: number) {
       handoverRequestType: "allergy_confirmation",
       retrievedManualCount: 1,
       retrievedDocumentChunkCount: 1,
+      documentRetrievalMode: "vector",
       createdAt: new Date(Date.now() - 21 * 60 * 1000),
       sessionId: 1,
       sessionStatus: "waiting_staff",
@@ -588,8 +639,11 @@ export async function getStaffAiLogDetail(logId: number) {
             chunkIndex: 0,
             content: "Sesame-free vegetarian options must be checked with staff.",
             score: 0.8,
+            retrievalMode: "vector",
+            scoreLabel: "Vector similarity: 0.800",
           },
         ],
+        documentRetrievalMode: "vector",
       },
     };
   }
@@ -609,6 +663,7 @@ function toStaffAiLogSummary(log: StaffAiLogRow): StaffAiLogSummary {
     handoverRuleName: log.handoverRuleName,
     retrievedManualCount: retrievedKnowledge.manualEntries.length,
     retrievedDocumentChunkCount: retrievedKnowledge.documentChunks.length,
+    documentRetrievalMode: retrievedKnowledge.documentRetrievalMode,
     createdAt: log.createdAt,
   };
 }
