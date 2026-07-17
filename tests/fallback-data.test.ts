@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isDatabaseUnavailable } from "@/lib/fallback-data";
+import { canUseCustomerFallbackData, isDatabaseUnavailable } from "@/lib/fallback-data";
+
+const originalNodeEnv = process.env.NODE_ENV;
+const mutableEnv = process.env as Record<string, string | undefined>;
+
+test.afterEach(() => {
+  mutableEnv.NODE_ENV = originalNodeEnv;
+});
+
+test("only enables customer fallback data in development and test", () => {
+  mutableEnv.NODE_ENV = "production";
+  assert.equal(canUseCustomerFallbackData(), false);
+
+  mutableEnv.NODE_ENV = "development";
+  assert.equal(canUseCustomerFallbackData(), true);
+
+  mutableEnv.NODE_ENV = "test";
+  assert.equal(canUseCustomerFallbackData(), true);
+});
 
 test("recognizes Prisma adapter tenant lookup failures as database unavailable", () => {
   const error = new Error("(ENOTFOUND) tenant/user postgres.engbjbnnwvnarnepauce not found");

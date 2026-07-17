@@ -22,3 +22,16 @@ test("serializes validation errors as client errors", async () => {
   assert.equal(body.code, "VALIDATION_ERROR");
   assert.equal(Array.isArray(body.issues), true);
 });
+
+test("redacts unexpected internal error details", async () => {
+  const response = toErrorResponse(
+    new Error("C:\\workspace\\repositories\\menu-item.repository.ts:24 Prisma query failed"),
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(body, {
+    message: "An unexpected server error occurred.",
+    code: "INTERNAL_ERROR",
+  });
+});
