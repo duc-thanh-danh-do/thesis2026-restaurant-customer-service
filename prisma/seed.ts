@@ -30,6 +30,81 @@ type MenuItemSeed = {
   allergens: string[];
 };
 
+type HandoverRuleSeed = {
+  name: string;
+  category: string;
+  requestType: string;
+  keywords: string[];
+  responseMessage: string;
+  priority: number;
+};
+
+const handoverRules: HandoverRuleSeed[] = [
+  {
+    name: "Emergency or medical concern",
+    category: "emergency",
+    requestType: "emergency_assistance",
+    keywords: ["emergency", "medical", "ambulance", "choking", "sick", "faint", "hurt"],
+    responseMessage: "Restaurant staff should assist immediately with this urgent request.",
+    priority: 100,
+  },
+  {
+    name: "Allergy confirmation",
+    category: "allergy",
+    requestType: "allergy_confirmation",
+    keywords: [
+      "allergy",
+      "allergic",
+      "allergen",
+      "gluten",
+      "peanut",
+      "nut",
+      "nuts",
+      "dairy",
+      "milk",
+      "egg",
+      "soy",
+      "sesame",
+      "shellfish",
+      "fish",
+    ],
+    responseMessage: "Restaurant staff should confirm allergy safety before the customer orders or eats.",
+    priority: 90,
+  },
+  {
+    name: "Complaint or manager request",
+    category: "complaint",
+    requestType: "complaint_support",
+    keywords: ["complaint", "complain", "manager", "wrong", "unhappy", "refund", "problem"],
+    responseMessage: "Restaurant staff should handle this service issue directly.",
+    priority: 80,
+  },
+  {
+    name: "Bill or payment request",
+    category: "payment",
+    requestType: "payment_assistance",
+    keywords: ["bill", "pay", "payment", "card", "cash", "receipt", "split"],
+    responseMessage: "Restaurant staff should help with payment or bill requests.",
+    priority: 70,
+  },
+  {
+    name: "Staff help requested",
+    category: "staff_help",
+    requestType: "staff_help",
+    keywords: ["staff", "waiter", "waitress", "server", "help", "call someone"],
+    responseMessage: "Restaurant staff should assist the customer directly.",
+    priority: 60,
+  },
+  {
+    name: "Unknown restaurant information",
+    category: "unknown_information",
+    requestType: "staff_help",
+    keywords: ["__low_confidence__"],
+    responseMessage: "Restaurant staff should confirm this because the answer was not available in the AI context.",
+    priority: 10,
+  },
+];
+
 async function upsertRestaurant() {
   const existing = await prisma.restaurant.findFirst({
     where: { name: "TestPizza" },
@@ -102,6 +177,46 @@ async function upsertKnowledgeBaseRecord(
   return prisma.restaurantKnowledgeBase.create({ data });
 }
 
+async function upsertHandoverRule(
+  restaurantId: number,
+  rule: HandoverRuleSeed,
+) {
+  await prisma.$executeRaw`
+    INSERT INTO "handover_rules" (
+      "restaurant_id",
+      "name",
+      "category",
+      "request_type",
+      "keywords",
+      "response_message",
+      "priority",
+      "is_active",
+      "created_at",
+      "updated_at"
+    )
+    VALUES (
+      ${restaurantId},
+      ${rule.name},
+      ${rule.category},
+      ${rule.requestType},
+      ${JSON.stringify(rule.keywords)}::jsonb,
+      ${rule.responseMessage},
+      ${rule.priority},
+      true,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT ("restaurant_id", "name")
+    DO UPDATE SET
+      "category" = EXCLUDED."category",
+      "request_type" = EXCLUDED."request_type",
+      "keywords" = EXCLUDED."keywords",
+      "response_message" = EXCLUDED."response_message",
+      "priority" = EXCLUDED."priority",
+      "updated_at" = NOW()
+  `;
+}
+
 async function main() {
   const restaurant = await upsertRestaurant();
   const staffPassword = process.env.STAFF_DEFAULT_PASSWORD ?? "staff1234";
@@ -113,7 +228,7 @@ async function main() {
       restaurantId: restaurant.id,
       name: "Shift Lead",
       passwordHash: staffPasswordHash,
-      role: "manager",
+      role: "admin",
       isActive: true,
     },
     create: {
@@ -121,7 +236,7 @@ async function main() {
       name: "Shift Lead",
       email: "staff@testpizza.local",
       passwordHash: staffPasswordHash,
-      role: "manager",
+      role: "admin",
       isActive: true,
       createdAt: new Date(),
     },
@@ -349,6 +464,10 @@ async function main() {
     category: "allergy_policy",
     isActive: true,
   });
+
+  for (const rule of handoverRules) {
+    await upsertHandoverRule(restaurant.id, rule);
+  }
 
   const table2 = await prisma.restaurantTable.findFirst({
     where: { tableNumber: "2" },

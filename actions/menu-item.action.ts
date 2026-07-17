@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnavailable } from "@/lib/fallback-data";
+import { requireAdminUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 interface CreateMenuItemInput {
@@ -45,6 +46,8 @@ function serializeMenuItem(item: MenuItemRow): MenuItemActionResult {
 }
 
 export async function createMenuItemAction(data: CreateMenuItemInput) {
+  await requireAdminUser();
+
   try {
     const newItem = await prisma.menuItem.create({
       data: {
@@ -80,6 +83,8 @@ export async function createMenuItemAction(data: CreateMenuItemInput) {
 }
 
 export async function getMenuItemsAction(): Promise<MenuItemActionResult[]> {
+  await requireAdminUser();
+
   try {
     const items = await prisma.menuItem.findMany({
       where: { restaurantId: 1 },
@@ -97,6 +102,8 @@ export async function getMenuItemsAction(): Promise<MenuItemActionResult[]> {
 
 // Delete Menu
 export async function deleteMenuItemAction(id: number) {
+  await requireAdminUser();
+
   try {
     await prisma.menuItemAllergen.deleteMany({
       where: { menuItemId: id },
@@ -126,6 +133,8 @@ export async function toggleMenuItemAvailabilityAction(
   id: number,
   currentStatus: boolean
 ) {
+  await requireAdminUser();
+
   try {
     await prisma.menuItem.update({
       where: { id },
@@ -149,6 +158,8 @@ export async function toggleMenuItemAvailabilityAction(
 
 // Edit MenuItem
 export async function editMenuItemAction(id: number, data: EditMenuItemInput) {
+  await requireAdminUser();
+
   try {
     const editItem = await prisma.menuItem.update({
       where: { id },

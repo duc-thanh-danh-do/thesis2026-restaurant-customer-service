@@ -19,6 +19,8 @@ model Restaurant {
   staffUsers    StaffUser[]
   menuItems     MenuItem[]
   knowledgeBase RestaurantKnowledgeBase[]
+  knowledgeDocuments KnowledgeDocument[]
+  handoverRules HandoverRule[]
 
   ingredientCatalogs IngredientCatalog[]
   dietaryCatalogs    DietaryCatalog[]
@@ -84,6 +86,7 @@ model StaffUser {
   isActive     Boolean    @default(true) @map("is_active")
   createdAt    DateTime?  @map("created_at")
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  uploadedKnowledgeDocuments KnowledgeDocument[]
 
   @@map("staff_users")
 }
@@ -166,6 +169,41 @@ model RestaurantKnowledgeBase {
   @@map("restaurant_knowledge_base")
 }
 
+model KnowledgeDocument {
+  id               Int                      @id @default(autoincrement())
+  restaurantId     Int                      @map("restaurant_id")
+  uploadedByStaffId Int?                    @map("uploaded_by_staff_id")
+  originalFilename String                   @map("original_filename") @db.VarChar(255)
+  mimeType         String                   @map("mime_type") @db.VarChar(255)
+  fileSize         Int                      @map("file_size")
+  status           String                   @db.VarChar(50)
+  isActive         Boolean                  @default(true) @map("is_active")
+  errorMessage     String?                  @map("error_message") @db.Text
+  createdAt        DateTime?                @map("created_at")
+  updatedAt        DateTime?                @map("updated_at")
+  restaurant       Restaurant               @relation(fields: [restaurantId], references: [id])
+  uploadedBy       StaffUser?               @relation(fields: [uploadedByStaffId], references: [id])
+  chunks           KnowledgeDocumentChunk[]
+
+  @@index([restaurantId, status, isActive])
+  @@index([uploadedByStaffId])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeDocumentChunk {
+  id         Int               @id @default(autoincrement())
+  documentId Int               @map("document_id")
+  chunkIndex Int               @map("chunk_index")
+  content    String            @db.Text
+  embedding  Unsupported("vector(768)")?
+  createdAt  DateTime?         @map("created_at")
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@map("knowledge_document_chunks")
+}
+
 model AiResponseLog {
   id                Int              @id @default(autoincrement())
   sessionId         Int?             @map("session_id")
@@ -173,15 +211,39 @@ model AiResponseLog {
   aiMessageId       Int?             @map("ai_message_id")
   modelName         String?          @map("model_name") @db.VarChar(100)
   retrievedContext  String?          @map("retrieved_context") @db.Text
+  retrievedKnowledge Json?           @map("retrieved_knowledge")
   prompt            String?          @db.Text
   response          String?          @db.Text
   handoverRequired  Boolean          @default(false) @map("handover_required")
+  handoverReason    String?          @map("handover_reason") @db.Text
+  handoverRuleId    Int?             @map("handover_rule_id")
   createdAt         DateTime?        @map("created_at")
   session           CustomerSession? @relation(fields: [sessionId], references: [id])
   customerMessage   ChatMessage?     @relation("AiCustomerMessageLog", fields: [customerMessageId], references: [id])
   aiMessage         ChatMessage?     @relation("AiMessageLog", fields: [aiMessageId], references: [id])
+  handoverRule      HandoverRule?    @relation(fields: [handoverRuleId], references: [id])
 
   @@map("ai_response_logs")
+}
+
+model HandoverRule {
+  id              Int             @id @default(autoincrement())
+  restaurantId    Int             @map("restaurant_id")
+  name            String          @db.VarChar(255)
+  category        String          @db.VarChar(100)
+  requestType     String          @map("request_type") @db.VarChar(100)
+  keywords        Json
+  responseMessage String?         @map("response_message") @db.Text
+  priority        Int             @default(0)
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime?       @map("created_at")
+  updatedAt       DateTime?       @map("updated_at")
+  restaurant      Restaurant      @relation(fields: [restaurantId], references: [id])
+  aiResponseLogs  AiResponseLog[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, isActive, priority])
+  @@map("handover_rules")
 }
 
 model AuditLog {

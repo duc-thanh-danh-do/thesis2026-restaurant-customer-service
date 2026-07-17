@@ -8,15 +8,27 @@ import {
   isDatabaseUnavailable,
 } from "@/lib/fallback-data";
 import { buildCustomerContext, buildGeminiPrompt } from "@/lib/ai/chat-prompt";
+import { buildGroundedContextForAi } from "@/lib/ai/grounded-context";
 import { logger } from "@/lib/logger";
 import { createChatMessage } from "@/repositories/chat-message.repository";
 import { findRestaurantContext } from "@/repositories/restaurant.repository";
 import { generateAiText } from "@/services/ai-assistant.service";
 import { createCustomerSession } from "@/services/customer-session.service";
 import {
+  buildHandoverReply,
+  createStaffHandover,
+  evaluateHandover,
+  updateAiLogHandoverReason,
+} from "@/services/handover.service";
+import {
   createUnconfirmedOrder,
   serializeOrderDraft,
 } from "@/services/customer-order.service";
+import {
+  buildRetrievedKnowledgeLog,
+  formatRetrievedKnowledge,
+  retrieveRelevantKnowledge,
+} from "@/services/knowledge-retrieval.service";
 
 const ACTIVE_SESSION_STATUSES = new Set(["active", "waiting_staff"]);
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -58,7 +70,15 @@ export async function sendCustomerChatMessage({
       customerMessage.id,
     );
     const customerContext = await getCustomerContext(session.id);
-    const groundedContext = buildGroundedContext(restaurant);
+    const retrievedKnowledge = await retrieveRelevantKnowledge({
+      restaurantId: session.restaurantId,
+      query: message,
+    });
+    const retrievedKnowledgeLog = buildRetrievedKnowledgeLog(retrievedKnowledge);
+    const groundedContext = buildGroundedContextForAi(
+      restaurant,
+      formatRetrievedKnowledge(retrievedKnowledge),
+    );
     const prompt = buildGeminiPrompt({
       groundedContext,
       customerContext,
@@ -71,8 +91,19 @@ export async function sendCustomerChatMessage({
       message,
       prompt,
     });
-    const handoverRequired = requiresStaffHandover(message);
-    const orderToolResult = qrToken
+    const handoverDecision = await evaluateHandover({
+      restaurantId: session.restaurantId,
+      message,
+      assistantReply: reply,
+    });
+    const handoverResult = handoverDecision.required
+      ? await createStaffHandover({
+          sessionId: session.id,
+          customerMessage: message,
+          decision: handoverDecision,
+        })
+      : null;
+    const orderToolResult = !handoverDecision.required && qrToken
       ? await maybeCreateOrderDraft({
           qrToken,
           sessionId: session.id,
@@ -83,13 +114,15 @@ export async function sendCustomerChatMessage({
       : null;
     const finalReply = orderToolResult
       ? buildOrderDraftReply(orderToolResult)
-      : shouldHandleAsOrderRequest(message)
-        ? buildUnresolvedOrderReply()
-        : reply;
+      : handoverDecision.required
+        ? buildHandoverReply(reply, handoverDecision)
+        : shouldHandleAsOrderRequest(message)
+          ? buildUnresolvedOrderReply()
+          : reply;
 
     const aiMessage = await createChatMessage(session.id, "ai", finalReply);
 
-    await prisma.aiResponseLog.create({
+    const aiLog = await prisma.aiResponseLog.create({
       data: {
         sessionId: session.id,
         customerMessageId: customerMessage.id,
@@ -98,17 +131,22 @@ export async function sendCustomerChatMessage({
         retrievedContext: groundedContext,
         prompt,
         response: finalReply,
-        handoverRequired,
+        handoverRequired: handoverDecision.required,
         createdAt: new Date(),
       },
+    });
+    await storeRetrievedKnowledgeLog(aiLog.id, retrievedKnowledgeLog);
+    await updateAiLogHandoverReason({
+      logId: aiLog.id,
+      decision: handoverDecision,
     });
 
     return {
       reply: finalReply,
-      handoverRequired,
-      requestId: null,
+      handoverRequired: handoverDecision.required,
+      requestId: handoverResult?.requestId ?? null,
       sessionToken: session.sessionToken,
-      sessionStatus: session.status,
+      sessionStatus: handoverDecision.required ? "waiting_staff" : session.status,
       aiMessage,
       orderDraft: orderToolResult?.orderDraft ?? null,
     };
@@ -123,11 +161,16 @@ export async function sendCustomerChatMessage({
       customerMessage: message,
     });
     const reply = normalizeReply(await generateAiText(prompt));
-    const handoverRequired = requiresStaffHandover(message);
+    const handoverDecision = await evaluateHandover({
+      message,
+      assistantReply: reply,
+    });
 
     return {
-      reply,
-      handoverRequired,
+      reply: handoverDecision.required
+        ? buildHandoverReply(reply, handoverDecision)
+        : reply,
+      handoverRequired: handoverDecision.required,
       requestId: null,
       sessionToken: sessionToken ?? null,
       sessionStatus: "active",
@@ -142,6 +185,34 @@ export async function sendCustomerChatMessage({
       fallback: true,
     };
   }
+}
+
+async function storeRetrievedKnowledgeLog(
+  logId: number,
+  retrievedKnowledgeLog: ReturnType<typeof buildRetrievedKnowledgeLog>,
+) {
+  try {
+    await prisma.$executeRaw`
+      UPDATE "ai_response_logs"
+      SET "retrieved_knowledge" = ${JSON.stringify(retrievedKnowledgeLog)}::jsonb
+      WHERE "id" = ${logId}
+    `;
+  } catch (error) {
+    if (
+      !isDatabaseUnavailable(error) &&
+      !isMissingRetrievedKnowledgeColumn(error)
+    ) {
+      logger.error("Failed to store retrieved AI knowledge details", error);
+    }
+  }
+}
+
+function isMissingRetrievedKnowledgeColumn(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("retrieved_knowledge") &&
+    error.message.includes("does not exist")
+  );
 }
 
 async function resolveActiveChatSession({
@@ -208,55 +279,6 @@ type RestaurantContext = Prisma.RestaurantGetPayload<{
     knowledgeBase: true;
   };
 }>;
-
-function buildGroundedContext(restaurant: RestaurantContext) {
-  const menuItems =
-    restaurant.menuItems.length > 0
-      ? restaurant.menuItems
-          .map((item) => {
-            const allergens = item.menuItemAllergens
-              .map(({ allergen }) => allergen.name)
-              .join(", ");
-
-            return [
-              `- ${item.name}`,
-              `  Description: ${item.description ?? "Not available"}`,
-              `  Category: ${item.category ?? "Not available"}`,
-              `  Price: ${item.price.toString()}`,
-              `  Available: ${item.isAvailable ? "yes" : "no"}`,
-              `  Dietary tags: ${item.dietary ?? "None"}`,
-              `  Ingredients: ${item.ingredients ?? "Not available"}`,
-              `  Allergens: ${allergens || "None listed"}`,
-            ].join("\n");
-          })
-          .join("\n\n")
-      : "No menu items are available in the provided data.";
-
-  const knowledgeBase =
-    restaurant.knowledgeBase.length > 0
-      ? restaurant.knowledgeBase
-          .map((record) =>
-            [
-              `- ${record.title}`,
-              `  Category: ${record.category ?? "Not available"}`,
-              `  Content: ${record.content}`,
-            ].join("\n"),
-          )
-          .join("\n\n")
-      : "No active restaurant knowledge base records are available.";
-
-  return [
-    `Restaurant: ${restaurant.name}`,
-    `Description: ${restaurant.description ?? "Not available"}`,
-    `Address: ${restaurant.address ?? "Not available"}`,
-    "",
-    "Menu items:",
-    menuItems,
-    "",
-    "Restaurant knowledge base:",
-    knowledgeBase,
-  ].join("\n");
-}
 
 async function getConversationHistory(
   sessionId: number,
@@ -592,10 +614,4 @@ function buildOrderDraftReply({
 
 function buildUnresolvedOrderReply() {
   return "I could not add that to your order draft yet. Please include the exact dish name from the menu, and I will prepare it for you to review.";
-}
-
-function requiresStaffHandover(message: string) {
-  return /\b(allerg\w*|bill|pay|payment|complaint|manager|staff|help)\b/i.test(
-    message,
-  );
 }

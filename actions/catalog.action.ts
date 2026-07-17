@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireAdminUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 async function getRestaurantId() {
@@ -39,6 +40,8 @@ export async function getIngredientsAction() {
 }
 
 export async function createDietaryTagAction(name: string) {
+  await requireAdminUser();
+
   try {
     const rId = await getRestaurantId(); 
     const newTag = await prisma.dietaryCatalog.create({
@@ -52,6 +55,8 @@ export async function createDietaryTagAction(name: string) {
 }
 
 export async function deleteDietaryTagAction(name: string) {
+  await requireAdminUser();
+
   try {
     const rId = await getRestaurantId(); 
     await prisma.dietaryCatalog.deleteMany({
@@ -65,6 +70,8 @@ export async function deleteDietaryTagAction(name: string) {
 }
 
 export async function createIngredientAction(name: string) {
+    await requireAdminUser();
+
     try {
       const rId = await getRestaurantId(); 
       const newTag = await prisma.ingredientCatalog.create({
@@ -82,6 +89,8 @@ export async function createIngredientAction(name: string) {
   }
   
   export async function deleteIngredientAction(name: string) {
+    await requireAdminUser();
+
     try {
       const rId = await getRestaurantId(); 
       await prisma.ingredientCatalog.deleteMany({
