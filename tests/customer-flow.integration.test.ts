@@ -13,7 +13,15 @@ import {
   GET as getCustomerOrdersRoute,
   POST as createCustomerOrderRoute,
 } from "@/app/api/customer-orders/route";
+import {
+  GET as getCustomerOrderRoute,
+  PATCH as updateCustomerOrderRoute,
+} from "@/app/api/customer-orders/[orderId]/route";
 import { POST as sendCustomerChatMessageRoute } from "@/app/api/chat/messages/route";
+import {
+  getStaffAiLogDetail,
+  getStaffAiLogs,
+} from "@/lib/staff-page-data";
 
 async function canReachDatabase() {
   try {
@@ -69,11 +77,13 @@ test("customer table flow persists session, messages, requests, orders, and clos
 
   const runId = `integration-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const restaurantName = `Integration Test Restaurant ${runId}`;
+  const otherRestaurantName = `Other Integration Restaurant ${runId}`;
   const qrCodeToken = `qr-${runId}`;
 
   await cleanupRestaurantByName(restaurantName);
   t.after(async () => {
     await cleanupRestaurantByName(restaurantName);
+    await cleanupRestaurantByName(otherRestaurantName);
   });
 
   const restaurant = await prisma.restaurant.create({
@@ -95,6 +105,37 @@ test("customer table flow persists session, messages, requests, orders, and clos
       createdAt: new Date(),
     },
   });
+
+  const concurrentTable = await prisma.restaurantTable.create({
+    data: {
+      restaurantId: restaurant.id,
+      tableNumber: "INT-CONCURRENT",
+      qrCodeToken: `qr-concurrent-${runId}`,
+      isActive: true,
+      createdAt: new Date(),
+    },
+  });
+  const concurrentSessionResponses = await Promise.all(
+    Array.from({ length: 5 }, () =>
+      createCustomerSessionRoute(
+        new Request("http://localhost/api/customer-sessions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ qrCodeToken: concurrentTable.qrCodeToken }),
+        }),
+      ),
+    ),
+  );
+  assert.ok(concurrentSessionResponses.every((response) => response.status === 201));
+  assert.equal(
+    await prisma.diningSession.count({
+      where: {
+        tableId: concurrentTable.id,
+        status: { in: ["active", "waiting_staff"] },
+      },
+    }),
+    1,
+  );
 
   const menuItem = await prisma.menuItem.create({
     data: {
@@ -164,7 +205,7 @@ test("customer table flow persists session, messages, requests, orders, and clos
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        requestType: "call_staff",
+        requestType: "staff_help",
         description: "Customer needs help with an allergy question.",
       }),
     }),
@@ -217,6 +258,27 @@ test("customer table flow persists session, messages, requests, orders, and clos
     where: { sessionToken },
   });
   assert.equal(waitingSession?.status, "waiting_staff");
+  const waitingDiningSession = await prisma.diningSession.findUnique({
+    where: { id: createdSession.diningSessionId },
+  });
+  assert.equal(waitingDiningSession?.status, "waiting_staff");
+
+  const otherRestaurant = await prisma.restaurant.create({
+    data: {
+      name: otherRestaurantName,
+      description: "Separate tenant for AI-log isolation testing.",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+  const aiLog = await prisma.aiResponseLog.findFirst({
+    where: { sessionId: createdSession.id },
+    orderBy: { id: "desc" },
+  });
+  assert.ok(aiLog);
+  assert.ok(await getStaffAiLogDetail(aiLog.id, restaurant.id));
+  assert.equal(await getStaffAiLogDetail(aiLog.id, otherRestaurant.id), null);
+  assert.equal((await getStaffAiLogs(otherRestaurant.id)).length, 0);
 
   const orderResponse = await createCustomerOrderRoute(
     new Request("http://localhost/api/customer-orders", {
@@ -235,6 +297,64 @@ test("customer table flow persists session, messages, requests, orders, and clos
   assert.equal(orderBody.sessionToken, sessionToken);
   assert.equal(orderBody.order.orderItems.length, 1);
   assert.equal(Number(orderBody.order.total), 25);
+
+  const otherTable = await prisma.restaurantTable.create({
+    data: {
+      restaurantId: restaurant.id,
+      tableNumber: "INT-2",
+      qrCodeToken: `qr-other-${runId}`,
+      isActive: true,
+      createdAt: new Date(),
+    },
+  });
+  const attackerSessionResponse = await createCustomerSessionRoute(
+    new Request("http://localhost/api/customer-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ qrCodeToken: otherTable.qrCodeToken }),
+    }),
+  );
+  const attackerSessionBody = await attackerSessionResponse.json();
+  const attackerSessionToken = attackerSessionBody.sessionToken as string;
+
+  const missingOwnerTokenResponse = await getCustomerOrderRoute(
+    new Request(`http://localhost/api/customer-orders/${orderBody.order.id}`),
+    { params: Promise.resolve({ orderId: String(orderBody.order.id) }) },
+  );
+  assert.equal(missingOwnerTokenResponse.status, 400);
+
+  const crossTableReadResponse = await getCustomerOrderRoute(
+    new Request(
+      `http://localhost/api/customer-orders/${orderBody.order.id}?sessionToken=${attackerSessionToken}`,
+    ),
+    { params: Promise.resolve({ orderId: String(orderBody.order.id) }) },
+  );
+  assert.equal(crossTableReadResponse.status, 404);
+
+  const crossTableUpdateResponse = await updateCustomerOrderRoute(
+    new Request(`http://localhost/api/customer-orders/${orderBody.order.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "confirm",
+        sessionToken: attackerSessionToken,
+      }),
+    }),
+    { params: Promise.resolve({ orderId: String(orderBody.order.id) }) },
+  );
+  assert.equal(crossTableUpdateResponse.status, 404);
+
+  const ownerUpdateResponse = await updateCustomerOrderRoute(
+    new Request(`http://localhost/api/customer-orders/${orderBody.order.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "confirm", sessionToken }),
+    }),
+    { params: Promise.resolve({ orderId: String(orderBody.order.id) }) },
+  );
+  const ownerUpdateBody = await ownerUpdateResponse.json();
+  assert.equal(ownerUpdateResponse.status, 200);
+  assert.equal(ownerUpdateBody.order.status, "placed");
 
   const ordersResponse = await getCustomerOrdersRoute(
     new Request(
@@ -274,4 +394,14 @@ test("customer table flow persists session, messages, requests, orders, and clos
   });
   assert.equal(closedSession?.status, "closed");
   assert.ok(closedSession?.endedAt);
+
+  const closedSessionRequestResponse = await createCustomerRequestRoute(
+    new Request(`http://localhost/api/customer-sessions/${sessionToken}/requests`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ requestType: "staff_help" }),
+    }),
+    { params: Promise.resolve({ sessionToken }) },
+  );
+  assert.equal(closedSessionRequestResponse.status, 409);
 });
