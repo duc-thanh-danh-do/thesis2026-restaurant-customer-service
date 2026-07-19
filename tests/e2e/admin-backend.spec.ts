@@ -29,7 +29,13 @@ test.describe.serial("database-backed administrator workspace", () => {
     await page.getByRole("button", { name: /Create new draft/i }).click();
     await expect(page.getByRole("heading", { name: "Instruction editor" })).toBeVisible();
 
-    await page.getByRole("textbox", { name: "" }).nth(2).fill(
+    await page.locator('textarea[name="rolePrompt"]').fill(
+      "Help restaurant guests using only structured menu and published knowledge data. Never invent menu items, prices, allergens, ingredients, or availability.",
+    );
+    await page.locator('textarea[name="handoverPrompt"]').fill(
+      "Immediately hand over uncertain allergen or cross-contamination questions, payment disputes, emergencies, complaints requiring a manager, and requests requiring physical staff action.",
+    );
+    await page.locator('textarea[name="releaseNotes"]').fill(
       "E2E: strengthen structured menu grounding and mandatory safety handover.",
     );
     await page.getByRole("button", { name: "Save draft" }).last().click();
