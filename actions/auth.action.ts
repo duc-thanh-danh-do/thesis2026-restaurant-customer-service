@@ -8,6 +8,7 @@ import {
   createStaffSessionCookieValue,
   getStaffSessionCookieName,
   getStaffSessionTtlSeconds,
+  shouldUseSecureStaffSessionCookie,
 } from "@/lib/auth";
 import {
   clearFailedStaffLogins,
@@ -76,7 +77,7 @@ export async function createStaffSession(email: string, password: string) {
   cookieStore.set(getStaffSessionCookieName(), createStaffSessionCookieValue(staffUser.id), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureStaffSessionCookie(),
     path: "/",
     maxAge: getStaffSessionTtlSeconds(),
   });
