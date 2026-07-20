@@ -5,6 +5,7 @@ import {
   canManageRestaurant,
   createStaffSessionCookieValue,
   getStaffSessionTtlSeconds,
+  shouldUseSecureStaffSessionCookie,
   verifyStaffSessionCookieValue,
 } from "@/lib/auth";
 
@@ -13,6 +14,7 @@ const originalAuthSecret = process.env.AUTH_SECRET;
 const originalNextAuthSecret = process.env.NEXTAUTH_SECRET;
 const originalNodeEnv = process.env.NODE_ENV;
 const originalSessionTtlSeconds = process.env.STAFF_SESSION_TTL_SECONDS;
+const originalSessionCookieSecure = process.env.STAFF_SESSION_COOKIE_SECURE;
 const mutableEnv = process.env as Record<string, string | undefined>;
 
 test.afterEach(() => {
@@ -40,6 +42,12 @@ test.afterEach(() => {
     delete process.env.STAFF_SESSION_TTL_SECONDS;
   } else {
     process.env.STAFF_SESSION_TTL_SECONDS = originalSessionTtlSeconds;
+  }
+
+  if (originalSessionCookieSecure === undefined) {
+    delete process.env.STAFF_SESSION_COOKIE_SECURE;
+  } else {
+    process.env.STAFF_SESSION_COOKIE_SECURE = originalSessionCookieSecure;
   }
 });
 
@@ -100,4 +108,27 @@ test("requires a staff session secret in production", () => {
   delete process.env.NEXTAUTH_SECRET;
 
   assert.throws(() => createStaffSessionCookieValue(42), /STAFF_SESSION_SECRET/);
+});
+
+test("uses secure session cookies by default in production", () => {
+  mutableEnv.NODE_ENV = "production";
+  delete process.env.STAFF_SESSION_COOKIE_SECURE;
+
+  assert.equal(shouldUseSecureStaffSessionCookie(), true);
+});
+
+test("allows an explicit insecure cookie only for an HTTP test server", () => {
+  mutableEnv.NODE_ENV = "production";
+  process.env.STAFF_SESSION_COOKIE_SECURE = "false";
+
+  assert.equal(shouldUseSecureStaffSessionCookie(), false);
+});
+
+test("rejects an invalid secure-cookie override", () => {
+  process.env.STAFF_SESSION_COOKIE_SECURE = "sometimes";
+
+  assert.throws(
+    () => shouldUseSecureStaffSessionCookie(),
+    /STAFF_SESSION_COOKIE_SECURE/,
+  );
 });

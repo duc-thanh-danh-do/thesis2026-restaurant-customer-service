@@ -78,6 +78,9 @@ export default defineConfig({
       STAFF_SESSION_SECRET:
         process.env.STAFF_SESSION_SECRET ??
         'playwright-only-session-secret-change-for-production',
+      // The production build is served over plain HTTP in local/CI browser tests.
+      // Real deployments keep the secure-cookie default because this override is absent.
+      STAFF_SESSION_COOKIE_SECURE: 'false',
     },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

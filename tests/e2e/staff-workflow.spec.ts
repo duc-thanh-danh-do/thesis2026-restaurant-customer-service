@@ -21,16 +21,17 @@ test.describe("Staff Workflow Tests", () => {
 
   test("should interact with active tables, send replies, and update statuses", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await signIn(page);
 
     await page.locator("span").getByText("Table 2", { exact: true }).click();
     await expect(page.getByText(/Session #\d+ -/)).toBeVisible();
 
+    const replyText = `Your request is being handled! (${testInfo.project.name}-${testInfo.retry})`;
     const replyInput = page.getByPlaceholder("Reply to the guest...");
-    await replyInput.fill("Your request is being handled!");
+    await replyInput.fill(replyText);
     await page.getByRole("button", { name: "Send reply" }).click();
-    await expect(page.getByText("Your request is being handled!")).toBeVisible();
+    await expect(page.getByText(replyText, { exact: true })).toBeVisible();
 
     const readyStep = page.getByRole("button", { name: /3 Ready/ });
     if (await readyStep.isVisible()) await readyStep.click();

@@ -24,6 +24,18 @@ export function getStaffSessionTtlSeconds() {
   return configured;
 }
 
+export function shouldUseSecureStaffSessionCookie() {
+  const configured = process.env.STAFF_SESSION_COOKIE_SECURE?.trim().toLowerCase();
+
+  if (configured === undefined || configured === "") {
+    return process.env.NODE_ENV === "production";
+  }
+  if (configured === "true") return true;
+  if (configured === "false") return false;
+
+  throw new Error('STAFF_SESSION_COOKIE_SECURE must be either "true" or "false".');
+}
+
 function getStaffSessionSecret() {
   const secret = getConfiguredStaffSessionSecret();
 
