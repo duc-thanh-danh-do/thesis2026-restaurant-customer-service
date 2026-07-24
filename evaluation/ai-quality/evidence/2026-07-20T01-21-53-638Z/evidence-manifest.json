@@ -1,0 +1,12 @@
+{
+  "algorithm": "SHA-256",
+  "files": {
+    "dataset-v1.0.0.json": "10fe86f7c8d865dd648699ddccc80cb31859991e72abfd6cff00eae110dc2584",
+    "manual-review.csv": "5af52e5d9d6cb3c7bfc5806a600f1744fb3b0671cff839d4a1b3cab8e5b1adb3",
+    "metrics.json": "a0f1ff5674b686b134c335bb0543ee59ce8f1c29a90988f33aa8f29e10289e40",
+    "metrics.md": "3b81a277f32e644c6c7aa1dddf47d074072e9b6e445737609e1ce0193ebcd983",
+    "README.md": "8ad423343efe822530085f3f38b55d5cad13490a2345e3da379133761e49a1a5",
+    "results.jsonl": "bdbc09e7bc6127564947d5dc003a20f99b4f0e5b7ee0308463e94a3f048b84a5",
+    "run-metadata.json": "7b087542810d55e3bc39501f4317426dace7f5f01d8331ef200c6104ef1e7c8a"
+  }
+}

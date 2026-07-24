@@ -1,0 +1,185 @@
+{
+  "run": {
+    "runId": "2026-07-20T01-21-53-638Z",
+    "startedAt": "2026-07-20T01:21:53.638Z",
+    "commit": "2cd49e703c49e3535fc8798f9f26e3eea506298a",
+    "dataset": {
+      "path": "dataset-v1.0.0.json",
+      "version": "1.0.0",
+      "sha256": "10fe86f7c8d865dd648699ddccc80cb31859991e72abfd6cff00eae110dc2584",
+      "selectedCaseCount": 36
+    },
+    "environment": {
+      "node": "v22.12.0",
+      "platform": "win32",
+      "arch": "x64",
+      "baseUrl": "http://127.0.0.1:3000",
+      "repetitions": 3,
+      "geminiModelEnvironment": "gemini-2.5-flash-lite",
+      "databaseHost": "redacted"
+    }
+  },
+  "coverage": {
+    "resultRows": 117,
+    "completedRows": 117,
+    "apiSuccessRate": 1,
+    "manuallyReviewedRows": 117
+  },
+  "handover": {
+    "truePositive": 36,
+    "falsePositive": 11,
+    "falseNegative": 18,
+    "trueNegative": 52,
+    "precision": 0.7659574468085106,
+    "recall": 0.6666666666666666
+  },
+  "automatic": {
+    "orderActionCorrectness": {
+      "passed": 117,
+      "total": 117,
+      "rate": 1
+    },
+    "retrievalRecall": {
+      "passed": 3,
+      "total": 15,
+      "rate": 0.2
+    },
+    "publicationIsolation": {
+      "passed": 15,
+      "total": 15,
+      "rate": 1
+    },
+    "replyConstraints": {
+      "passed": 74,
+      "total": 93,
+      "rate": 0.7956989247311828
+    },
+    "overallPassRate": 0.6837606837606838,
+    "byCategory": [
+      {
+        "category": "availability",
+        "passed": 3,
+        "total": 3,
+        "rate": 1
+      },
+      {
+        "category": "conversation_continuity",
+        "passed": 12,
+        "total": 12,
+        "rate": 1
+      },
+      {
+        "category": "dietary_fact",
+        "passed": 3,
+        "total": 3,
+        "rate": 1
+      },
+      {
+        "category": "document_knowledge",
+        "passed": 0,
+        "total": 6,
+        "rate": 0
+      },
+      {
+        "category": "handover",
+        "passed": 15,
+        "total": 18,
+        "rate": 0.8333333333333334
+      },
+      {
+        "category": "handover_false_positive",
+        "passed": 0,
+        "total": 3,
+        "rate": 0
+      },
+      {
+        "category": "manual_knowledge",
+        "passed": 3,
+        "total": 6,
+        "rate": 0.5
+      },
+      {
+        "category": "menu_fact",
+        "passed": 6,
+        "total": 9,
+        "rate": 0.6666666666666666
+      },
+      {
+        "category": "missing_information",
+        "passed": 3,
+        "total": 3,
+        "rate": 1
+      },
+      {
+        "category": "multi_turn_order",
+        "passed": 6,
+        "total": 6,
+        "rate": 1
+      },
+      {
+        "category": "multilingual",
+        "passed": 0,
+        "total": 3,
+        "rate": 0
+      },
+      {
+        "category": "multilingual_safety",
+        "passed": 0,
+        "total": 6,
+        "rate": 0
+      },
+      {
+        "category": "order_action",
+        "passed": 6,
+        "total": 6,
+        "rate": 1
+      },
+      {
+        "category": "order_restraint",
+        "passed": 6,
+        "total": 6,
+        "rate": 1
+      },
+      {
+        "category": "order_safety",
+        "passed": 3,
+        "total": 3,
+        "rate": 1
+      },
+      {
+        "category": "prompt_override",
+        "passed": 5,
+        "total": 9,
+        "rate": 0.5555555555555556
+      },
+      {
+        "category": "publication_isolation",
+        "passed": 9,
+        "total": 12,
+        "rate": 0.75
+      },
+      {
+        "category": "tenant_isolation",
+        "passed": 0,
+        "total": 3,
+        "rate": 0
+      }
+    ]
+  },
+  "manual": {
+    "groundedCorrectness": 0.9363636363636364,
+    "unsupportedClaimRate": 0.035398230088495575,
+    "safetyPassRate": 0.8469387755102041,
+    "meanRelevance": 4.6068376068376065,
+    "meanCompleteness": 4.3076923076923075,
+    "totalFactualClaims": 226,
+    "totalUnsupportedClaims": 8
+  },
+  "latencyMs": {
+    "count": 117,
+    "mean": 1626.5443589743593,
+    "p50": 1707.77,
+    "p95": 2001.19,
+    "maximum": 2509.3
+  }
+}

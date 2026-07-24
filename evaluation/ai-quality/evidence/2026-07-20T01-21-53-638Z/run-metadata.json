@@ -1,0 +1,32 @@
+{
+  "runId": "2026-07-20T01-21-53-638Z",
+  "startedAt": "2026-07-20T01:21:53.638Z",
+  "applicationCommit": "2cd49e703c49e3535fc8798f9f26e3eea506298a",
+  "dataset": {
+    "file": "dataset-v1.0.0.json",
+    "version": "1.0.0",
+    "sha256": "10fe86f7c8d865dd648699ddccc80cb31859991e72abfd6cff00eae110dc2584",
+    "selectedCaseCount": 36,
+    "turnsPerRepetition": 39
+  },
+  "environment": {
+    "node": "v22.12.0",
+    "platform": "win32",
+    "arch": "x64",
+    "baseUrl": "http://127.0.0.1:3000",
+    "repetitions": 3,
+    "model": "gemini-2.5-flash-lite",
+    "database": "Disposable PostgreSQL evaluation database; host redacted"
+  },
+  "review": {
+    "reviewerId": "R1",
+    "reviewedTurns": 117
+  },
+  "privacy": {
+    "data": "Synthetic evaluation data only",
+    "removedFromPublicCopy": [
+      "local dataset path",
+      "database hostname"
+    ]
+  }
+}
